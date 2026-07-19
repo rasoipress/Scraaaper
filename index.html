@@ -56,9 +56,26 @@
       <button class="chip active" data-source="zlib">Z-Library</button>
     </nav>
 
+    <section id="jstorAccess" class="jstor-access" aria-live="polite" hidden>
+      <div class="jstor-copy">
+        <span class="jstor-mark" aria-hidden="true">J</span>
+        <div>
+          <strong id="jstorTitle">JSTOR per studenti</strong>
+          <p id="jstorMessage">Collega università o biblioteca per accedere ai contenuti disponibili.</p>
+        </div>
+      </div>
+      <div class="jstor-actions">
+        <button id="jstorConnect" class="pill-btn" type="button">Collega università</button>
+        <button id="jstorSearch" class="pill-btn" type="button">Cerca su JSTOR</button>
+      </div>
+    </section>
+
     <main>
       <div class="status-row">
-        <p id="status" class="status"></p>
+        <div class="search-progress">
+          <span id="searchSpinner" class="search-spinner" aria-hidden="true" hidden></span>
+          <p id="status" class="status"></p>
+        </div>
         <div id="resultControls" class="result-controls" aria-label="Controlli risultati"></div>
       </div>
       <div id="grid" class="grid"></div>
@@ -69,6 +86,7 @@
     </footer>
   </div>
 
+  <script src="search-results.js"></script>
   <script src="app.js"></script>
   <script>
     const isLocalHost = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(window.location.hostname);

@@ -206,6 +206,11 @@ body.ready .page {
   background: var(--button-hover);
 }
 
+.pill-btn:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 #q {
   width: 100%;
   border: none;
@@ -228,6 +233,66 @@ body.ready .page {
   padding: 16px 0;
   border-bottom: 1px solid var(--line);
   margin-bottom: 24px;
+}
+
+.jstor-access {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: -8px 0 24px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--button-bg);
+}
+
+.jstor-access[hidden] {
+  display: none;
+}
+
+.jstor-copy,
+.jstor-actions,
+.search-progress {
+  display: flex;
+  align-items: center;
+}
+
+.jstor-copy {
+  gap: 10px;
+  min-width: 0;
+}
+
+.jstor-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--black);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.jstor-copy strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 12px;
+}
+
+.jstor-copy p {
+  margin: 0;
+  color: var(--gray);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.jstor-actions {
+  flex: 0 0 auto;
+  gap: 8px;
 }
 
 .chip {
@@ -299,6 +364,36 @@ body.dark .chip.active {
   font-size: 13px;
   min-height: 18px;
   margin: 0;
+}
+
+.search-progress {
+  gap: 8px;
+  min-width: 0;
+}
+
+.search-spinner {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  border: 1.5px solid var(--line);
+  border-top-color: var(--accent);
+  border-right-color: var(--gray);
+  border-radius: 50%;
+  animation: search-spin 0.7s linear infinite;
+}
+
+.search-spinner[hidden] {
+  display: none;
+}
+
+@keyframes search-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-spinner {
+    animation-duration: 1.8s;
+  }
 }
 
 .result-controls {
@@ -479,6 +574,16 @@ body.dark .chip.active {
   .sources {
     gap: 6px;
     padding-bottom: 12px;
+  }
+  .jstor-access {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: -4px;
+  }
+  .jstor-actions {
+    flex-wrap: wrap;
+    width: 100%;
   }
   .chip {
     padding: 7px 12px;

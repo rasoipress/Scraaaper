@@ -29,11 +29,27 @@ Quando trova una versione più recente mostra un avviso e apre il download corre
 
 Il controllo manuale è disponibile dal menu **Aiuto → Controlla aggiornamenti…**.
 
+## Ricerca progressiva
+
+Le fonti vengono interrogate in parallelo e i risultati compaiono appena ciascuna fonte risponde. Durante la ricerca, un indicatore minimale mostra quante fonti sono state completate e quanti risultati sono già disponibili. Le fonti più lente continuano a lavorare senza nascondere i risultati già trovati.
+
+## Accesso universitario JSTOR
+
+Nell’app desktop, quando JSTOR è selezionato compare il riquadro **JSTOR per studenti**.
+
+- **Collega università** apre la pagina ufficiale JSTOR per scegliere università o biblioteca e usare SSO, proxy o le modalità previste dall’istituzione.
+- Scraaaper non riceve e non salva password, codici di autenticazione o credenziali universitarie.
+- La sessione e i cookie JSTOR restano nel profilo locale dell’app sul computer dello studente.
+- **Cerca su JSTOR** apre la ricerca completa di JSTOR nella stessa sessione autenticata.
+- Anche i risultati JSTOR presenti nella griglia vengono aperti nella sessione collegata, così l’accesso istituzionale non viene perso.
+
+L’accesso non viene imposto all’avvio: il riquadro è visibile ma non blocca le ricerche pubbliche. Questa integrazione richiede l’app desktop e non è disponibile nella sola versione GitHub Pages.
+
 ## Fonti e accesso
 
 - Le fonti con API o cataloghi leggibili vengono interrogate direttamente.
 - Le fonti protette o senza API vengono cercate tramite un indice web limitato al loro dominio.
-- Login, CAPTCHA e condizioni di accesso dei singoli siti non vengono aggirati.
+- Login, CAPTCHA e condizioni di accesso dei singoli siti non vengono aggirati; l’utente effettua personalmente gli accessi previsti dai siti supportati.
 - Se una fonte è temporaneamente irraggiungibile, l’app lo segnala senza mostrare risultati fittizi.
 
 ## Sviluppo locale

@@ -19,6 +19,7 @@ if (check.status !== 0) {
 
 const webFiles = [
   "app.js",
+  "search-results.js",
   "index.html",
   "style.css",
   "manifest.webmanifest",

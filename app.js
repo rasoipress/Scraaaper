@@ -8,7 +8,18 @@ const UI_TEXT = {
     empty: "Nessun risultato.",
     backendOffline: "Il motore di ricerca non risponde. Chiudi e riapri Scraaaper.",
     indexed: "indice web",
+    progress: (completed, total, count) => `${completed}/${total} fonti completate · ${count} risultati`,
     footer: "/ scraaaper è un motore di ricerca gratuito e open source per la ricerca di libri da fonti pubbliche, archivi e librerie online",
+    jstor: {
+      title: "JSTOR per studenti",
+      disconnected: "Collega università o biblioteca per accedere ai contenuti disponibili.",
+      connected: "Accesso universitario rilevato. La sessione resta soltanto su questo computer.",
+      opened: "Completa l’accesso nella finestra ufficiale JSTOR.",
+      connect: "Collega università",
+      manage: "Verifica o cambia",
+      search: "Cerca su JSTOR",
+      error: "Non è stato possibile aprire JSTOR.",
+    },
     results: (count, failedSources, hasRealResults) => {
       const base = `${count} risultati`;
       if (failedSources.length) {
@@ -42,7 +53,18 @@ const UI_TEXT = {
     empty: "No results.",
     backendOffline: "The search engine is not responding. Quit and reopen Scraaaper.",
     indexed: "web index",
+    progress: (completed, total, count) => `${completed}/${total} sources completed · ${count} results`,
     footer: "/ scraaaper is a free and open-source search engine for finding books from public sources, archives, and online libraries",
+    jstor: {
+      title: "JSTOR for students",
+      disconnected: "Connect your university or library to access available content.",
+      connected: "Institutional access detected. The session stays only on this computer.",
+      opened: "Complete sign-in in the official JSTOR window.",
+      connect: "Connect university",
+      manage: "Verify or change",
+      search: "Search JSTOR",
+      error: "JSTOR could not be opened.",
+    },
     results: (count, failedSources, hasRealResults) => {
       const base = `${count} results`;
       if (failedSources.length) {
@@ -152,6 +174,12 @@ const footerText = document.getElementById("footerText");
 const themeToggle = document.getElementById("themeToggle");
 const langToggle = document.getElementById("langToggle");
 const resultControls = document.getElementById("resultControls");
+const searchSpinner = document.getElementById("searchSpinner");
+const jstorAccess = document.getElementById("jstorAccess");
+const jstorTitle = document.getElementById("jstorTitle");
+const jstorMessage = document.getElementById("jstorMessage");
+const jstorConnect = document.getElementById("jstorConnect");
+const jstorSearch = document.getElementById("jstorSearch");
 
 let activeSources = new Set(Object.keys(SOURCE_LABELS));
 let currentController = null;
@@ -161,6 +189,8 @@ let lastFailedSources = [];
 let currentSort = "relevance";
 let currentFormat = "all";
 let currentLang = localStorage.getItem("reading-lang") || "it";
+let searchInProgress = false;
+let jstorInstitutionalAccess = false;
 const landing = document.getElementById("landing");
 const landingWord = document.getElementById("landingWord");
 
@@ -187,11 +217,52 @@ function applyLanguage(lang) {
       chip.textContent = lang === "en" ? "All" : "Tutte";
     }
   });
+  updateJstorPanel();
   if (qInput.value.trim()) {
     runSearch(qInput.value);
   } else {
     status.textContent = "";
   }
+}
+
+function setSearchInProgress(active) {
+  searchInProgress = active;
+  searchSpinner.hidden = !active;
+  document.querySelector("main").setAttribute("aria-busy", String(active));
+}
+
+function updateJstorPanel(messageOverride = "") {
+  const bridge = window.scraaaperDesktop?.jstor;
+  const shouldShow = Boolean(bridge && activeSources.has("jstor"));
+  jstorAccess.hidden = !shouldShow;
+  if (!shouldShow) return;
+  const text = UI_TEXT[currentLang].jstor;
+  jstorTitle.textContent = text.title;
+  jstorMessage.textContent = messageOverride || (
+    jstorInstitutionalAccess ? text.connected : text.disconnected
+  );
+  jstorConnect.textContent = jstorInstitutionalAccess ? text.manage : text.connect;
+  jstorSearch.textContent = text.search;
+  jstorSearch.disabled = !qInput.value.trim();
+}
+
+async function initializeJstorIntegration() {
+  const bridge = window.scraaaperDesktop?.jstor;
+  if (!bridge) {
+    jstorAccess.hidden = true;
+    return;
+  }
+  try {
+    const savedStatus = await bridge.status();
+    jstorInstitutionalAccess = savedStatus?.institutionalAccess === true;
+  } catch {
+    jstorInstitutionalAccess = false;
+  }
+  bridge.onStatusChanged((nextStatus) => {
+    jstorInstitutionalAccess = nextStatus?.institutionalAccess === true;
+    updateJstorPanel();
+  });
+  updateJstorPanel();
 }
 
 const savedTheme = localStorage.getItem("reading-theme");
@@ -292,7 +363,7 @@ function renderCard(item) {
   const metaText = buildMetaLine(item);
 
   return `
-    <a class="card${isShortcut ? " card-shortcut" : ""}" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">
+    <a class="card${isShortcut ? " card-shortcut" : ""}" data-source="${escapeHtml(item.source)}" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">
       <div class="cover">
         <span class="source-tag">${escapeHtml(SOURCE_LABELS[item.source] || item.source)}${escapeHtml(modeSuffix)}</span>
         ${coverHtml}
@@ -397,7 +468,7 @@ function renderResults() {
   const visible = getVisibleResults();
   if (visible.length === 0) {
     grid.innerHTML = "";
-    if (qInput.value.trim()) {
+    if (qInput.value.trim() && !searchInProgress) {
       grid.innerHTML = `<p class="empty">${UI_TEXT[currentLang].empty}</p>`;
     }
     return;
@@ -407,73 +478,110 @@ function renderResults() {
 
 async function runSearch(query) {
   if (currentController) currentController.abort();
-  currentController = new AbortController();
-  const { signal } = currentController;
+  const controller = new AbortController();
+  currentController = controller;
+  const { signal } = controller;
 
   if (!query.trim()) {
     lastResults = [];
     lastFailedSources = [];
     status.textContent = "";
+    setSearchInProgress(false);
+    updateJstorPanel();
     renderResults();
     return;
   }
 
-  status.textContent = UI_TEXT[currentLang].searching;
+  setSearchInProgress(true);
+  status.textContent = UI_TEXT[currentLang].progress(0, activeSources.size, 0);
   renderResultControls();
   grid.innerHTML = "";
+  updateJstorPanel();
 
   const sourceKeys = Object.keys(FETCHERS).filter((key) => activeSources.has(key));
-  const settled = await Promise.allSettled(
-    sourceKeys.map((key) => FETCHERS[key](query, signal))
-  );
-
-  if (signal.aborted) return;
-
-  let merged = [];
-  let failedSources = [];
+  const resultsBySource = {};
+  const failedSources = [];
   let backendUnavailable = false;
-  settled.forEach((result, i) => {
-    const key = sourceKeys[i];
-    if (result.status === "fulfilled") {
-      merged = merged.concat(result.value);
-    } else {
-      failedSources.push(SOURCE_LABELS[key]);
-      if (result.reason && result.reason.code === "BACKEND_UNAVAILABLE") {
-        backendUnavailable = true;
-      }
-    }
-  });
+  let completed = 0;
 
-  // interleave results from different sources instead of grouping by source
-  const bySource = {};
-  merged.forEach((item) => {
-    (bySource[item.source] = bySource[item.source] || []).push(item);
-  });
-  const interleaved = [];
-  let more = true;
-  while (more) {
-    more = false;
-    for (const key of sourceKeys) {
-      const arr = bySource[key];
-      if (arr && arr.length) {
-        interleaved.push(arr.shift());
-        more = true;
-      }
-    }
+  const refresh = () => {
+    if (signal.aborted) return;
+    const interleaved = window.ScraaaperSearch.interleaveResults(resultsBySource, sourceKeys);
+    const hasRealResults = interleaved.some(isGenuineResult);
+    lastResults = interleaved;
+    lastFailedSources = [...failedSources];
+    status.textContent = completed < sourceKeys.length
+      ? UI_TEXT[currentLang].progress(completed, sourceKeys.length, interleaved.length)
+      : backendUnavailable && failedSources.length === sourceKeys.length
+        ? UI_TEXT[currentLang].backendOffline
+        : UI_TEXT[currentLang].results(interleaved.length, failedSources, hasRealResults);
+    renderResults();
+  };
+
+  if (sourceKeys.length === 0) {
+    setSearchInProgress(false);
+    status.textContent = UI_TEXT[currentLang].empty;
+    renderResults();
+    return;
   }
 
-  const hasRealResults = interleaved.some(isGenuineResult);
-  lastResults = interleaved;
-  lastFailedSources = failedSources;
-  status.textContent = backendUnavailable
-    ? UI_TEXT[currentLang].backendOffline
-    : UI_TEXT[currentLang].results(interleaved.length, failedSources, hasRealResults);
-  renderResults();
+  refresh();
+  await Promise.all(sourceKeys.map(async (key) => {
+    try {
+      resultsBySource[key] = await FETCHERS[key](query, signal);
+    } catch (error) {
+      if (signal.aborted) return;
+      failedSources.push(SOURCE_LABELS[key]);
+      if (error?.code === "BACKEND_UNAVAILABLE") backendUnavailable = true;
+    } finally {
+      if (!signal.aborted) {
+        completed += 1;
+        refresh();
+      }
+    }
+  }));
+
+  if (signal.aborted || currentController !== controller) return;
+  setSearchInProgress(false);
+  refresh();
 }
 
 qInput.addEventListener("input", () => {
   clearTimeout(debounceTimer);
+  updateJstorPanel();
   debounceTimer = setTimeout(() => runSearch(qInput.value), 350);
+});
+
+jstorConnect.addEventListener("click", async () => {
+  const bridge = window.scraaaperDesktop?.jstor;
+  if (!bridge) return;
+  jstorConnect.disabled = true;
+  try {
+    await bridge.connect();
+    updateJstorPanel(UI_TEXT[currentLang].jstor.opened);
+  } catch {
+    updateJstorPanel(UI_TEXT[currentLang].jstor.error);
+  } finally {
+    jstorConnect.disabled = false;
+  }
+});
+
+jstorSearch.addEventListener("click", async () => {
+  const bridge = window.scraaaperDesktop?.jstor;
+  if (!bridge || !qInput.value.trim()) return;
+  try {
+    await bridge.search(qInput.value.trim());
+  } catch {
+    updateJstorPanel(UI_TEXT[currentLang].jstor.error);
+  }
+});
+
+grid.addEventListener("click", (event) => {
+  const card = event.target.closest("a.card[data-source='jstor']");
+  const bridge = window.scraaaperDesktop?.jstor;
+  if (!card || !bridge) return;
+  event.preventDefault();
+  bridge.open(card.href).catch(() => updateJstorPanel(UI_TEXT[currentLang].jstor.error));
 });
 
 resultControls.addEventListener("click", (e) => {
@@ -525,4 +633,7 @@ sourcesNav.addEventListener("click", (e) => {
   } else {
     renderResults();
   }
+  updateJstorPanel();
 });
+
+initializeJstorIntegration();
