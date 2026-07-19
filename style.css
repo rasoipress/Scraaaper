@@ -13,6 +13,8 @@
   --tag-bg: rgba(255,255,255,0.92);
   --tag-text: #767676;
   --chip-hover-border: #ccc;
+  --spinner-ring: #111;
+  --spinner-gap: #fdfdfc;
   color-scheme: light;
 }
 
@@ -32,6 +34,8 @@ body.dark {
   --tag-bg: rgba(0, 0, 0, 0.88);
   --tag-text: #f0f0e6;
   --chip-hover-border: #4c4c49;
+  --spinner-ring: #f5f5f0;
+  --spinner-gap: #060606;
   color-scheme: dark;
 }
 
@@ -279,8 +283,41 @@ body.ready .page {
 
 .jstor-copy strong {
   display: block;
-  margin-bottom: 2px;
   font-size: 12px;
+}
+
+.jstor-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.jstor-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--gray);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.jstor-state[data-state="connected"] {
+  border-color: var(--chip-active-bg);
+  background: var(--chip-active-bg);
+  color: var(--chip-active-text);
+}
+
+.jstor-state[data-state="checking"] {
+  border-style: dashed;
+  color: var(--black);
 }
 
 .jstor-copy p {
@@ -375,9 +412,8 @@ body.dark .chip.active {
   width: 13px;
   height: 13px;
   flex: 0 0 auto;
-  border: 1.5px solid var(--line);
-  border-top-color: var(--accent);
-  border-right-color: var(--gray);
+  border: 1.5px solid var(--spinner-ring);
+  border-top-color: var(--spinner-gap);
   border-radius: 50%;
   animation: search-spin 0.7s linear infinite;
 }

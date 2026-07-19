@@ -14,11 +14,15 @@ const UI_TEXT = {
       title: "JSTOR per studenti",
       disconnected: "Collega università o biblioteca per accedere ai contenuti disponibili.",
       connected: "Accesso universitario rilevato. La sessione resta soltanto su questo computer.",
-      opened: "Completa l’accesso nella finestra ufficiale JSTOR.",
+      checking: "Completa l’accesso nella finestra JSTOR: Scraaaper verificherà automaticamente la sessione.",
       connect: "Collega università",
       manage: "Verifica o cambia",
+      verify: "Verifica accesso",
       search: "Cerca su JSTOR",
       error: "Non è stato possibile aprire JSTOR.",
+      stateConnected: "Collegato",
+      stateDisconnected: "Non collegato",
+      stateChecking: "Verifica in corso",
     },
     results: (count, failedSources, hasRealResults) => {
       const base = `${count} risultati`;
@@ -59,11 +63,15 @@ const UI_TEXT = {
       title: "JSTOR for students",
       disconnected: "Connect your university or library to access available content.",
       connected: "Institutional access detected. The session stays only on this computer.",
-      opened: "Complete sign-in in the official JSTOR window.",
+      checking: "Complete sign-in in the JSTOR window: Scraaaper will verify the session automatically.",
       connect: "Connect university",
       manage: "Verify or change",
+      verify: "Verify access",
       search: "Search JSTOR",
       error: "JSTOR could not be opened.",
+      stateConnected: "Connected",
+      stateDisconnected: "Not connected",
+      stateChecking: "Checking",
     },
     results: (count, failedSources, hasRealResults) => {
       const base = `${count} results`;
@@ -177,8 +185,10 @@ const resultControls = document.getElementById("resultControls");
 const searchSpinner = document.getElementById("searchSpinner");
 const jstorAccess = document.getElementById("jstorAccess");
 const jstorTitle = document.getElementById("jstorTitle");
+const jstorState = document.getElementById("jstorState");
 const jstorMessage = document.getElementById("jstorMessage");
 const jstorConnect = document.getElementById("jstorConnect");
+const jstorVerify = document.getElementById("jstorVerify");
 const jstorSearch = document.getElementById("jstorSearch");
 
 let activeSources = new Set(Object.keys(SOURCE_LABELS));
@@ -191,6 +201,7 @@ let currentFormat = "all";
 let currentLang = localStorage.getItem("reading-lang") || "it";
 let searchInProgress = false;
 let jstorInstitutionalAccess = false;
+let jstorChecking = false;
 const landing = document.getElementById("landing");
 const landingWord = document.getElementById("landingWord");
 
@@ -210,6 +221,11 @@ function applyLanguage(lang) {
   localStorage.setItem("reading-lang", lang);
   qInput.placeholder = UI_TEXT[lang].placeholder;
   document.documentElement.lang = lang === "en" ? "en" : "it";
+  langToggle.textContent = lang === "en" ? "ITA" : "ENG";
+  langToggle.setAttribute(
+    "aria-label",
+    lang === "en" ? "Passa all’italiano" : "Switch to English"
+  );
   footerText.textContent = UI_TEXT[lang].footer;
   sourcesNav.querySelectorAll(".chip").forEach((chip) => {
     const source = chip.dataset.source;
@@ -237,13 +253,27 @@ function updateJstorPanel(messageOverride = "") {
   jstorAccess.hidden = !shouldShow;
   if (!shouldShow) return;
   const text = UI_TEXT[currentLang].jstor;
+  const state = jstorChecking
+    ? "checking"
+    : jstorInstitutionalAccess ? "connected" : "disconnected";
   jstorTitle.textContent = text.title;
   jstorMessage.textContent = messageOverride || (
-    jstorInstitutionalAccess ? text.connected : text.disconnected
+    jstorChecking ? text.checking
+      : jstorInstitutionalAccess ? text.connected : text.disconnected
   );
+  jstorState.dataset.state = state;
+  jstorState.textContent = state === "checking"
+    ? text.stateChecking
+    : state === "connected" ? text.stateConnected : text.stateDisconnected;
   jstorConnect.textContent = jstorInstitutionalAccess ? text.manage : text.connect;
+  jstorVerify.textContent = text.verify;
   jstorSearch.textContent = text.search;
   jstorSearch.disabled = !qInput.value.trim();
+}
+
+function applyJstorStatus(nextStatus) {
+  jstorInstitutionalAccess = nextStatus?.institutionalAccess === true;
+  jstorChecking = nextStatus?.checking === true;
 }
 
 async function initializeJstorIntegration() {
@@ -254,12 +284,13 @@ async function initializeJstorIntegration() {
   }
   try {
     const savedStatus = await bridge.status();
-    jstorInstitutionalAccess = savedStatus?.institutionalAccess === true;
+    applyJstorStatus(savedStatus);
   } catch {
     jstorInstitutionalAccess = false;
+    jstorChecking = false;
   }
   bridge.onStatusChanged((nextStatus) => {
-    jstorInstitutionalAccess = nextStatus?.institutionalAccess === true;
+    applyJstorStatus(nextStatus);
     updateJstorPanel();
   });
   updateJstorPanel();
@@ -557,12 +588,26 @@ jstorConnect.addEventListener("click", async () => {
   if (!bridge) return;
   jstorConnect.disabled = true;
   try {
-    await bridge.connect();
-    updateJstorPanel(UI_TEXT[currentLang].jstor.opened);
+    applyJstorStatus(await bridge.connect());
+    updateJstorPanel();
   } catch {
     updateJstorPanel(UI_TEXT[currentLang].jstor.error);
   } finally {
     jstorConnect.disabled = false;
+  }
+});
+
+jstorVerify.addEventListener("click", async () => {
+  const bridge = window.scraaaperDesktop?.jstor;
+  if (!bridge) return;
+  jstorVerify.disabled = true;
+  try {
+    applyJstorStatus(await bridge.verify());
+    updateJstorPanel();
+  } catch {
+    updateJstorPanel(UI_TEXT[currentLang].jstor.error);
+  } finally {
+    jstorVerify.disabled = false;
   }
 });
 

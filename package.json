@@ -1,6 +1,6 @@
 {
   "name": "scraaaper-desktop",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Ricerca libri e documenti in cataloghi e archivi online su macOS e Windows",
   "main": "desktop/main.js",
   "repository": {

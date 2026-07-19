@@ -38,6 +38,8 @@ Le fonti vengono interrogate in parallelo e i risultati compaiono appena ciascun
 Nell’app desktop, quando JSTOR è selezionato compare il riquadro **JSTOR per studenti**.
 
 - **Collega università** apre la pagina ufficiale JSTOR per scegliere università o biblioteca e usare SSO, proxy o le modalità previste dall’istituzione.
+- Il riquadro mostra sempre **Non collegato**, **Verifica in corso** o **Collegato** e ricontrolla automaticamente JSTOR al termine del flusso universitario.
+- Se il portale dell’università non torna automaticamente a JSTOR, **Verifica accesso** apre JSTOR nella stessa sessione e aggiorna lo stato.
 - Scraaaper non riceve e non salva password, codici di autenticazione o credenziali universitarie.
 - La sessione e i cookie JSTOR restano nel profilo locale dell’app sul computer dello studente.
 - **Cerca su JSTOR** apre la ricerca completa di JSTOR nella stessa sessione autenticata.

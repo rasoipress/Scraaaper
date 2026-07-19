@@ -31,10 +31,18 @@ function accessStateFromPageText(value) {
   return { institutionalAccess: false, conclusive: false };
 }
 
+function accessUpdateFromPageText(value, { allowDisconnected = false } = {}) {
+  const state = accessStateFromPageText(value);
+  if (state.institutionalAccess) return true;
+  if (state.conclusive && allowDisconnected) return false;
+  return null;
+}
+
 module.exports = {
   JSTOR_HOME_URL,
   JSTOR_INSTITUTION_URL,
   accessStateFromPageText,
+  accessUpdateFromPageText,
   isJstorUrl,
   jstorSearchUrl,
 };
