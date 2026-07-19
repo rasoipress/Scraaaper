@@ -1,7 +1,7 @@
 {
   "name": "scraaaper-desktop",
-  "version": "0.2.0",
-  "description": "Ricerca libri e documenti in cataloghi e archivi online",
+  "version": "0.3.0",
+  "description": "Ricerca libri e documenti in cataloghi e archivi online su macOS e Windows",
   "main": "desktop/main.js",
   "repository": {
     "type": "git",
@@ -10,10 +10,11 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test",
-    "build:engine": "sh scripts/build-engine.sh",
+    "build:engine": "node scripts/build-engine.mjs",
     "dist:mac": "pnpm run build:engine && electron-builder --mac dmg zip --publish never",
     "dist:mac:x64": "pnpm run build:engine && electron-builder --mac dmg zip --x64 --publish never",
-    "dist:mac:arm64": "pnpm run build:engine && electron-builder --mac dmg zip --arm64 --publish never"
+    "dist:mac:arm64": "pnpm run build:engine && electron-builder --mac dmg zip --arm64 --publish never",
+    "dist:win": "pnpm run build:engine && electron-builder --win nsis zip --x64 --publish never"
   },
   "packageManager": "pnpm@11.9.0",
   "devDependencies": {
@@ -41,7 +42,7 @@
         "to": "search-service"
       }
     ],
-    "artifactName": "Scraaaper-${version}-${arch}.${ext}",
+    "artifactName": "Scraaaper-${version}-${os}-${arch}.${ext}",
     "mac": {
       "icon": "build/icon.svg",
       "category": "public.app-category.reference",
@@ -66,6 +67,23 @@
           "path": "/Applications"
         }
       ]
+    },
+    "win": {
+      "icon": "build/icon",
+      "signExecutable": false,
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Scraaaper",
+      "uninstallDisplayName": "Scraaaper"
     }
   }
 }

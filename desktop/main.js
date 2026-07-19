@@ -4,6 +4,7 @@ const { app, BrowserWindow, Menu, dialog, net, shell } = require("electron");
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 const readline = require("node:readline");
+const { assetForCurrentPlatform } = require("./release");
 const { isNewerVersion } = require("./version");
 
 const REPOSITORY = "rasoipress/Scraaaper";
@@ -33,8 +34,11 @@ async function openExternal(value) {
 
 function engineLaunchConfig() {
   if (app.isPackaged) {
+    const executable = process.platform === "win32"
+      ? "scraaaper-search-service.exe"
+      : "scraaaper-search-service";
     return {
-      command: path.join(process.resourcesPath, "search-service", "scraaaper-search-service"),
+      command: path.join(process.resourcesPath, "search-service", executable),
       args: ["--host", "127.0.0.1", "--port", "0", "--no-browser"],
       cwd: process.resourcesPath,
     };
@@ -144,20 +148,12 @@ async function createMainWindow(engineUrl) {
   await mainWindow.loadURL(engineUrl);
 }
 
-function assetForCurrentMac(release) {
-  const names = process.arch === "arm64" ? ["arm64", "aarch64"] : ["x64", "x86_64"];
-  return (release.assets || []).find((asset) => {
-    const name = String(asset.name || "").toLowerCase();
-    return name.endsWith(".dmg") && names.some((architecture) => name.includes(architecture));
-  });
-}
-
 async function showUpdateDialog(release) {
   const latest = release.tag_name;
   if (updateDialogOpen || latest === lastNotifiedVersion) return;
   updateDialogOpen = true;
   lastNotifiedVersion = latest;
-  const asset = assetForCurrentMac(release);
+  const asset = assetForCurrentPlatform(release);
   const published = release.published_at
     ? new Intl.DateTimeFormat("it-IT", { dateStyle: "long" }).format(new Date(release.published_at))
     : "";
@@ -288,6 +284,7 @@ function createMenu() {
 }
 
 async function bootstrap() {
+  if (process.platform === "win32") app.setAppUserModelId("app.scraaaper.desktop");
   app.setAboutPanelOptions({
     applicationName: "Scraaaper",
     applicationVersion: app.getVersion(),
