@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Reading icon">
+  <rect width="128" height="128" rx="24" fill="#111111"/>
+  <rect x="24" y="24" width="80" height="80" rx="14" fill="#fdfdfc"/>
+  <path d="M44 44h40M44 64h28M44 84h20" stroke="#111111" stroke-width="8" stroke-linecap="round"/>
+</svg>

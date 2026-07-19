@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#111111" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data: https:; style-src 'self'; script-src 'self' 'unsafe-inline'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" />
+<title>Scraaaper — ebook search</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+</head>
+<body class="dark">
+  <div id="landing" class="landing" aria-hidden="true">
+    <div id="landingWord" class="landing-word">scraping</div>
+    <div id="landingFill" class="landing-fill"></div>
+  </div>
+  <div class="page">
+    <header class="top">
+      <div class="logo" aria-label="Scraaaper">Scraaaper</div>
+      <div class="search-wrap">
+        <input id="q" type="text" placeholder="Cerca un titolo, un autore…" autocomplete="off" autofocus />
+      </div>
+      <div class="header-actions">
+        <button id="themeToggle" class="theme-toggle" type="button" aria-pressed="false" aria-label="Attiva o disattiva modalità scura">
+          <span class="theme-toggle-track" aria-hidden="true">
+            <span class="theme-toggle-knob"></span>
+          </span>
+        </button>
+        <button id="langToggle" class="pill-btn" type="button" aria-label="Switch to English">ENG</button>
+      </div>
+    </header>
+
+    <nav class="sources" id="sources">
+      <button class="chip active" data-source="all">Tutte</button>
+      <button class="chip active" data-source="annasarchive">Anna's Archive</button>
+      <button class="chip active" data-source="archive">Internet Archive</button>
+      <button class="chip active" data-source="bdebooks">BDE Books</button>
+      <button class="chip active" data-source="bookracy">Bookracy</button>
+      <button class="chip active" data-source="booksee">Booksee</button>
+      <button class="chip active" data-source="ebookoz">Ebookoz</button>
+      <button class="chip active" data-source="freebannedbooks">FreeBannedBooks</button>
+      <button class="chip active" data-source="gutenberg">Project Gutenberg</button>
+      <button class="chip active" data-source="inventaire">Inventaire</button>
+      <button class="chip active" data-source="jstor">JSTOR</button>
+      <button class="chip active" data-source="liber3">Liber3</button>
+      <button class="chip active" data-source="libgen">LibGen</button>
+      <button class="chip active" data-source="mobilism">Mobilism Forum</button>
+      <button class="chip active" data-source="monoskop">Monoskop</button>
+      <button class="chip active" data-source="myanonamouse">MyAnonamouse</button>
+      <button class="chip active" data-source="openlibrary">Open Library</button>
+      <button class="chip active" data-source="scribd">Scribd</button>
+      <button class="chip active" data-source="standardebooks">Standard Ebooks</button>
+      <button class="chip active" data-source="vkbookstagram">VK Bookstagram</button>
+      <button class="chip active" data-source="wikisource">Wikisource</button>
+      <button class="chip active" data-source="zlib">Z-Library</button>
+    </nav>
+
+    <main>
+      <div class="status-row">
+        <p id="status" class="status"></p>
+        <div id="resultControls" class="result-controls" aria-label="Controlli risultati"></div>
+      </div>
+      <div id="grid" class="grid"></div>
+    </main>
+
+    <footer class="foot">
+      <span id="footerText">/ scraaaper è un motore di ricerca gratuito e open source per la ricerca di libri da fonti pubbliche, archivi e librerie online</span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    const isLocalHost = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(window.location.hostname);
+    if ('serviceWorker' in navigator && !isLocalHost) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(console.error);
+      });
+    }
+  </script>
+</body>
+</html>

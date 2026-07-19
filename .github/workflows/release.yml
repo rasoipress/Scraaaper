@@ -1,0 +1,70 @@
+name: Pubblica app macOS
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      matrix:
+        include:
+          - runner: macos-15-intel
+            arch: x64
+          - runner: macos-15
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verifica versione del tag
+        shell: bash
+        run: |
+          APP_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION=${GITHUB_REF_NAME#v}
+          if [[ "$APP_VERSION" != "$TAG_VERSION" ]]; then
+            echo "Il tag $GITHUB_REF_NAME non corrisponde alla versione $APP_VERSION di package.json."
+            exit 1
+          fi
+      - name: Installa dipendenze
+        run: |
+          python3 -m pip install pyinstaller certifi
+          pnpm install --frozen-lockfile
+      - name: Crea motore integrato
+        run: pnpm run build:engine
+      - name: Crea applicazione
+        run: pnpm exec electron-builder --mac dmg zip --${{ matrix.arch }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Scraaaper-${{ matrix.arch }}
+          path: |
+            release/*.dmg
+            release/*.zip
+
+  release:
+    name: Crea GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true

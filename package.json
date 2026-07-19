@@ -1,0 +1,71 @@
+{
+  "name": "scraaaper-desktop",
+  "version": "0.2.0",
+  "description": "Ricerca libri e documenti in cataloghi e archivi online",
+  "main": "desktop/main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasoipress/Scraaaper.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "build:engine": "sh scripts/build-engine.sh",
+    "dist:mac": "pnpm run build:engine && electron-builder --mac dmg zip --publish never",
+    "dist:mac:x64": "pnpm run build:engine && electron-builder --mac dmg zip --x64 --publish never",
+    "dist:mac:arm64": "pnpm run build:engine && electron-builder --mac dmg zip --arm64 --publish never"
+  },
+  "packageManager": "pnpm@11.9.0",
+  "devDependencies": {
+    "electron": "^43.1.1",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "app.scraaaper.desktop",
+    "productName": "Scraaaper",
+    "asar": true,
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "electronDownload": {
+      "cache": "work/electron-cache"
+    },
+    "files": [
+      "desktop/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist-bin/scraaaper-search-service",
+        "to": "search-service"
+      }
+    ],
+    "artifactName": "Scraaaper-${version}-${arch}.${ext}",
+    "mac": {
+      "icon": "build/icon.svg",
+      "category": "public.app-category.reference",
+      "identity": null,
+      "hardenedRuntime": false,
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "dmg": {
+      "title": "Scraaaper ${version}",
+      "contents": [
+        {
+          "x": 140,
+          "y": 210
+        },
+        {
+          "x": 400,
+          "y": 210,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  }
+}
