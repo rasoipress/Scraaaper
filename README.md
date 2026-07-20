@@ -5,7 +5,7 @@ Il motore di ricerca è incorporato nell’app: non servono Python, Terminale, s
 
 ## Installazione
 
-1. Apri la sezione **Releases** del repository GitHub (qui in alto a destra).
+1. Apri la sezione **Releases** del repository GitHub (qui in alto a destra) o al link https://github.com/rasoipress/Scraaaper/releases .
 2. Scarica il file adatto al computer.
 
 ### Windows
@@ -20,7 +20,7 @@ Il motore di ricerca è incorporato nell’app: non servono Python, Terminale, s
   - `arm64` per Mac con chip Apple Silicon;
   - `x64` per Mac Intel.
 - Trascina **Scraaaper** nella cartella Applicazioni.
-- Poiché l’app è distribuita gratuitamente e non è firmata, al primo avvio potrebbe essere necessario fare clic destro sull’icona, scegliere **Apri** e confermare. In caso di errore come "file danneggiato" premere annulla, andare su "impostazioni di sistema" > sicurezza e privacy > scorrere verso il fondo e confermare l'apertura dell'app bloccata.
+- Poiché l’app è distribuita gratuitamente e non è firmata, al primo avvio potrebbe essere necessario fare clic destro sull’icona, scegliere **Apri** e confermare. In caso di errore come "file danneggiato" premere annulla, andare su "impostazioni di sistema" > sicurezza e privacy > scorrere verso il fondo e confermare l'apertura dell'app bloccata tramite "Apri comunque".
 
 ## Aggiornamenti
 
