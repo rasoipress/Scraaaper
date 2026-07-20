@@ -33,6 +33,13 @@ Il controllo manuale è disponibile dal menu **Aiuto → Controlla aggiornamenti
 
 Le fonti vengono interrogate in parallelo e i risultati compaiono appena ciascuna fonte risponde. Durante la ricerca, un indicatore minimale mostra quante fonti sono state completate e quanti risultati sono già disponibili. Le fonti più lente continuano a lavorare senza nascondere i risultati già trovati.
 
+## Metadati, filtri e DOI
+
+- Ogni risultato mostra nell’ordine **autore – titolo – anno – formato**; quando una fonte non fornisce un dato, Scraaaper lo indica senza inventarlo.
+- I controlli di ordinamento, formato e lingua sono separati visivamente. Il menu lingua consente una selezione multipla e rende grigie le lingue assenti nei risultati correnti.
+- La stessa barra riconosce DOI nel formato `10.…/…`, `doi:10.…/…` e `https://doi.org/10.…/…`.
+- Per un DOI, Scraaaper interroga le fonti selezionate e aggiunge una risoluzione diretta dei metadati tramite le API pubbliche e gratuite di Crossref e DataCite.
+
 ## Accesso universitario JSTOR
 
 Nell’app desktop, quando JSTOR è selezionato compare il riquadro **JSTOR per studenti**.

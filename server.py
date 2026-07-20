@@ -55,6 +55,7 @@ _last_index_request = 0.0
 
 
 SOURCE_LABELS = {
+    "doi": "DOI",
     "annasarchive": "Anna's Archive",
     "archive": "Internet Archive",
     "bdebooks": "BDE Books",
@@ -76,6 +77,26 @@ SOURCE_LABELS = {
     "vkbookstagram": "VK Bookstagram",
     "wikisource": "Wikisource",
     "zlib": "Z-Library",
+}
+
+
+LANGUAGE_ALIASES = {
+    "arabic": "ar", "ara": "ar", "bangla": "bn", "bengali": "bn", "ben": "bn",
+    "bulgarian": "bg", "bul": "bg", "catalan": "ca", "cat": "ca", "chinese": "zh",
+    "chi": "zh", "zho": "zh", "czech": "cs", "cze": "cs", "ces": "cs",
+    "danish": "da", "dan": "da", "dutch": "nl", "dut": "nl", "nld": "nl",
+    "english": "en", "eng": "en", "finnish": "fi", "fin": "fi", "french": "fr",
+    "fre": "fr", "fra": "fr", "german": "de", "ger": "de", "deu": "de",
+    "greek": "el", "gre": "el", "ell": "el", "hebrew": "he", "heb": "he",
+    "hindi": "hi", "hin": "hi", "hungarian": "hu", "hun": "hu", "icelandic": "is",
+    "ice": "is", "isl": "is", "indonesian": "id", "ind": "id", "italian": "it",
+    "ita": "it", "japanese": "ja", "jpn": "ja", "korean": "ko", "kor": "ko",
+    "latin": "la", "lat": "la", "norwegian": "no", "nor": "no", "persian": "fa",
+    "per": "fa", "fas": "fa", "polish": "pl", "pol": "pl", "portuguese": "pt",
+    "por": "pt", "romanian": "ro", "rum": "ro", "ron": "ro", "russian": "ru",
+    "rus": "ru", "spanish": "es", "spa": "es", "swedish": "sv", "swe": "sv",
+    "turkish": "tr", "tur": "tr", "ukrainian": "uk", "ukr": "uk", "vietnamese": "vi",
+    "vie": "vi",
 }
 
 
@@ -171,6 +192,41 @@ def clean_text(value: Any, limit: int = 180) -> str:
     return re.sub(r"\s+", " ", text).strip()[:limit]
 
 
+def normalize_doi(value: Any) -> str:
+    candidate = unquote(clean_text(value, 300)).strip()
+    candidate = re.sub(r"^doi\s*:\s*", "", candidate, flags=re.I)
+    candidate = re.sub(r"^https?://(?:dx\.)?doi\.org/", "", candidate, flags=re.I)
+    candidate = re.sub(r"\s+", "", candidate).rstrip(".,;:")
+    if not re.fullmatch(r"10\.\d{4,9}/[\w.()/:;+-]+", candidate, flags=re.I):
+        return ""
+    return candidate.casefold()
+
+
+def normalize_languages(value: Any) -> list[str]:
+    values = value if isinstance(value, (list, tuple, set)) else re.split(r"[,;]", str(value or ""))
+    normalized: list[str] = []
+    for entry in values:
+        raw = clean_text(entry, 60).casefold().replace("_", "-")
+        base = raw.split("-", 1)[0]
+        code = LANGUAGE_ALIASES.get(raw) or LANGUAGE_ALIASES.get(base)
+        if not code and re.fullmatch(r"[a-z]{2}", base):
+            code = base
+        if code and code not in normalized:
+            normalized.append(code)
+    return normalized
+
+
+def detect_file_type(formats: Any) -> str | None:
+    values = formats.keys() if isinstance(formats, dict) else formats or []
+    if isinstance(values, str):
+        values = [values]
+    joined = " ".join(str(value).casefold() for value in values)
+    for file_type in ("pdf", "epub", "mobi", "azw3", "djvu", "fb2", "txt", "html", "docx"):
+        if file_type in joined:
+            return file_type
+    return None
+
+
 def item(
     source: str,
     title: Any,
@@ -180,6 +236,8 @@ def item(
     year: Any = "",
     cover: str | None = None,
     file_type: str | None = None,
+    languages: Any = None,
+    doi: Any = "",
     search_mode: str = "native",
 ) -> dict[str, Any]:
     return {
@@ -190,6 +248,8 @@ def item(
         "cover": cover or None,
         "link": link,
         "fileType": clean_text(file_type, 20).lower() or None,
+        "languages": normalize_languages(languages),
+        "doi": normalize_doi(doi) or None,
         "searchMode": search_mode,
     }
 
@@ -297,7 +357,8 @@ def native_anchor_search(
 
 
 def search_openlibrary(query: str, lang: str) -> list[dict[str, Any]]:
-    params = urlencode({"q": query, "limit": RESULT_LIMIT})
+    doi = normalize_doi(query)
+    params = urlencode({"q": f"doi:{doi}" if doi else query, "limit": RESULT_LIMIT})
     data = fetch_json(f"https://openlibrary.org/search.json?{params}")
     results = []
     for doc in data.get("docs", []):
@@ -313,6 +374,8 @@ def search_openlibrary(query: str, lang: str) -> list[dict[str, Any]]:
                 author=author,
                 year=doc.get("first_publish_year", ""),
                 cover=f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg" if cover_id else None,
+                languages=doc.get("language"),
+                doi=doi,
             )
         )
     return dedupe(results)
@@ -333,7 +396,8 @@ def search_gutenberg(query: str, lang: str) -> list[dict[str, Any]]:
                 f"https://www.gutenberg.org/ebooks/{book.get('id')}",
                 author=authors,
                 cover=formats.get("image/jpeg"),
-                file_type="html",
+                file_type=detect_file_type(formats),
+                languages=book.get("languages"),
             )
         )
     return dedupe(results)
@@ -343,7 +407,7 @@ def search_archive(query: str, lang: str) -> list[dict[str, Any]]:
     params = urlencode(
         {
             "q": f"{query} AND mediatype:texts",
-            "fl[]": ["identifier", "title", "creator", "year", "format"],
+            "fl[]": ["identifier", "title", "creator", "year", "format", "language"],
             "rows": RESULT_LIMIT,
             "output": "json",
         },
@@ -372,6 +436,7 @@ def search_archive(query: str, lang: str) -> list[dict[str, Any]]:
                 year=doc.get("year", ""),
                 cover=f"https://archive.org/services/img/{quote(str(identifier))}",
                 file_type=detected,
+                languages=doc.get("language"),
             )
         )
     return dedupe(results)
@@ -428,6 +493,7 @@ def search_mediawiki(source: str, query: str, lang: str) -> list[dict[str, Any]]
                 page.get("fullurl") or endpoint,
                 cover=(page.get("thumbnail") or {}).get("source"),
                 file_type="html",
+                languages=[lang] if source == "wikisource" else None,
             )
         )
     return dedupe(results)
@@ -442,7 +508,11 @@ def search_standardebooks(query: str, lang: str) -> list[dict[str, Any]]:
         root = ET.fromstring(data)
     except ET.ParseError as exc:
         raise SearchError("feed OPDS non valido da Standard Ebooks") from exc
-    ns = {"atom": "http://www.w3.org/2005/Atom"}
+    ns = {
+        "atom": "http://www.w3.org/2005/Atom",
+        "dcterms": "http://purl.org/dc/terms/",
+        "dc": "http://purl.org/dc/elements/1.1/",
+    }
     results = []
     for entry in root.findall("atom:entry", ns):
         title = entry.findtext("atom:title", default="", namespaces=ns)
@@ -463,6 +533,12 @@ def search_standardebooks(query: str, lang: str) -> list[dict[str, Any]]:
             elif rel.endswith("image/thumbnail"):
                 cover = link_node.attrib.get("href")
         published = entry.findtext("atom:published", default="", namespaces=ns)
+        languages = [
+            node.text
+            for path in ("dcterms:language", "dc:language")
+            for node in entry.findall(path, ns)
+            if node.text
+        ]
         results.append(
             item(
                 "standardebooks",
@@ -472,6 +548,7 @@ def search_standardebooks(query: str, lang: str) -> list[dict[str, Any]]:
                 year=published[:4],
                 cover=cover,
                 file_type="epub",
+                languages=languages,
             )
         )
     return dedupe(results)
@@ -495,6 +572,7 @@ def search_bookracy(query: str, lang: str) -> list[dict[str, Any]]:
                 year=book.get("year", ""),
                 cover=book.get("book_image") or (f"https://api.bookracy.com/cover/{md5}/thumbnail.jpg" if md5 else None),
                 file_type=book.get("book_filetype"),
+                languages=book.get("language") or book.get("languages"),
             )
         )
     return dedupe(results)
@@ -526,19 +604,142 @@ def search_scribd(query: str, lang: str) -> list[dict[str, Any]]:
                 author=author.get("name", "") if isinstance(author, dict) else author,
                 year=released_at[:4],
                 cover=document.get("image_url") or document.get("retina_image_url"),
+                languages=document.get("language") or document.get("locale"),
             )
         )
     return dedupe(results)
 
 
+def crossref_item_from_message(message: dict[str, Any], requested_doi: str) -> dict[str, Any]:
+    title_values = message.get("title") or message.get("short-title") or []
+    title = title_values[0] if isinstance(title_values, list) and title_values else title_values
+    author_names = []
+    for author in message.get("author") or []:
+        if not isinstance(author, dict):
+            continue
+        name = clean_text(" ".join(part for part in (author.get("given", ""), author.get("family", "")) if part), 120)
+        if name:
+            author_names.append(name)
+    if len(author_names) > 8:
+        author_names = [*author_names[:8], "…"]
+
+    year = ""
+    for date_key in ("published-print", "published-online", "published", "issued", "created"):
+        date_parts = (message.get(date_key) or {}).get("date-parts") or []
+        if date_parts and date_parts[0]:
+            year = str(date_parts[0][0])
+            break
+
+    doi = normalize_doi(message.get("DOI")) or requested_doi
+    return item(
+        "doi",
+        title or doi,
+        f"https://doi.org/{quote(doi, safe='/():;+-._')}",
+        author=", ".join(author_names),
+        year=year,
+        languages=message.get("language"),
+        doi=doi,
+    )
+
+
+def search_doi(query: str, lang: str) -> list[dict[str, Any]]:
+    doi = normalize_doi(query)
+    if not doi:
+        return []
+    crossref_error: Exception | None = None
+    try:
+        data = fetch_json(f"https://api.crossref.org/works/{quote(doi, safe='')}")
+        message = data.get("message") if isinstance(data, dict) else None
+        if isinstance(message, dict):
+            return [crossref_item_from_message(message, doi)]
+    except SearchError as exc:
+        crossref_error = exc
+
+    try:
+        data = fetch_json(f"https://api.datacite.org/dois/{quote(doi, safe='')}")
+        attributes = ((data.get("data") or {}).get("attributes") or {}) if isinstance(data, dict) else {}
+        if not isinstance(attributes, dict):
+            raise SearchError("DataCite non ha restituito metadati DOI validi")
+        titles = attributes.get("titles") or []
+        title = next((entry.get("title") for entry in titles if isinstance(entry, dict) and entry.get("title")), doi)
+        authors = []
+        for creator in attributes.get("creators") or []:
+            if not isinstance(creator, dict):
+                continue
+            name = creator.get("name") or " ".join(
+                part for part in (creator.get("givenName", ""), creator.get("familyName", "")) if part
+            )
+            if name:
+                authors.append(clean_text(name, 120))
+        if len(authors) > 8:
+            authors = [*authors[:8], "…"]
+        published = clean_text(attributes.get("published") or attributes.get("publicationYear"), 20)
+        year_match = re.search(r"(?:18|19|20)\d{2}", published)
+        return [
+            item(
+                "doi",
+                title,
+                f"https://doi.org/{quote(doi, safe='/():;+-._')}",
+                author=", ".join(authors),
+                year=year_match.group(0) if year_match else "",
+                languages=attributes.get("language"),
+                doi=doi,
+            )
+        ]
+    except SearchError as datacite_error:
+        raise SearchError(f"DOI non trovato: Crossref ({crossref_error}); DataCite ({datacite_error})") from datacite_error
+
+
+def parse_annasarchive_results(page: str, url: str) -> list[dict[str, Any]]:
+    blocks = re.split(r'<div class="flex\s+pt-3 pb-3 border-b', page)[1:]
+    results: list[dict[str, Any]] = []
+    for block in blocks:
+        anchors = parse_anchors(block)
+        md5_anchors = [anchor for anchor in anchors if re.fullmatch(r"/md5/[a-f0-9]{32}", anchor.href, flags=re.I)]
+        if not md5_anchors:
+            continue
+        title_candidates = [clean_text(anchor.text, 240) for anchor in md5_anchors if clean_text(anchor.text, 240)]
+        title = max(title_candidates, key=len, default="")
+        if not title:
+            continue
+        link = urljoin(url, md5_anchors[0].href)
+        author_anchor = next((anchor for anchor in anchors if anchor.href.startswith("/search?q=") and anchor.text), None)
+        author = clean_text(author_anchor.text, 180) if author_anchor else ""
+        cover_path = next((anchor.image for anchor in md5_anchors if anchor.image), "")
+        cover = urljoin(url, html.unescape(cover_path)) if cover_path else None
+        metadata_text = clean_text(block, 8000)
+        language_match = re.search(r'([^·]{2,40})\s+\[([a-z]{2,3}(?:-[A-Za-z]+)?)\]\s*·', metadata_text)
+        format_match = re.search(r'\b(PDF|EPUB|MOBI|AZW3|DJVU|FB2|TXT|HTML|DOCX|CHM|RAR)\s*·', metadata_text, flags=re.I)
+        file_type = format_match.group(1) if format_match else None
+        languages = [language_match.group(2)] if language_match else None
+        year = ""
+        if format_match:
+            nearby_year = re.search(r'(?<!\d)((?:18|19|20)\d{2})(?!\d)', metadata_text[format_match.end():format_match.end() + 180])
+            year = nearby_year.group(1) if nearby_year else ""
+        results.append(
+            item(
+                "annasarchive",
+                title,
+                link,
+                author=author,
+                year=year,
+                cover=cover,
+                file_type=file_type,
+                languages=languages,
+            )
+        )
+        if len(results) >= RESULT_LIMIT:
+            break
+    return dedupe(results)
+
+
 def search_annasarchive(query: str, lang: str) -> list[dict[str, Any]]:
     url = f"https://annas-archive.gl/search?{urlencode({'q': query})}"
-    return native_anchor_search(
-        "annasarchive",
-        url,
-        r"annas-archive\.gl/md5/[a-f0-9]{32}",
-        title_filter=lambda title: title.casefold() not in {"download", "slow downloads", "fast downloads"},
-    )
+    page = fetch_text(url)
+    parsed = parse_annasarchive_results(page, url)
+    if parsed:
+        return parsed
+    return native_anchor_search("annasarchive", url, r"annas-archive\.gl/md5/[a-f0-9]{32}")
 
 
 def search_bdebooks(query: str, lang: str) -> list[dict[str, Any]]:
@@ -580,6 +781,7 @@ def search_freebannedbooks(query: str, lang: str) -> list[dict[str, Any]]:
                 author=author,
                 cover=urljoin(url, anchor.image) if anchor.image else None,
                 file_type="pdf",
+                languages=["en"],
             )
         )
     return dedupe(results)
@@ -684,6 +886,7 @@ def indexed_search(source: str, query: str) -> list[dict[str, Any]]:
 NativeSearch = Callable[[str, str], list[dict[str, Any]]]
 
 NATIVE_SEARCHERS: dict[str, NativeSearch] = {
+    "doi": search_doi,
     "annasarchive": search_annasarchive,
     "archive": search_archive,
     "bdebooks": search_bdebooks,

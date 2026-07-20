@@ -244,7 +244,7 @@ function registerJstorIntegration() {
   ipcMain.handle("jstor:verify", () => verifyJstorAccessAtHome());
   ipcMain.handle("jstor:search", (_event, query) => {
     const normalized = String(query || "").trim();
-    if (!normalized) throw new Error("Inserisci prima un titolo o un autore.");
+    if (!normalized) throw new Error("Inserisci prima un titolo, un autore o un DOI.");
     return openJstorWindow(jstorSearchUrl(normalized));
   });
   ipcMain.handle("jstor:open", (_event, url) => openJstorWindow(url));

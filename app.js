@@ -3,7 +3,7 @@ const SOURCE_TIMEOUT_MS = 30_000;
 
 const UI_TEXT = {
   it: {
-    placeholder: "Cerca un titolo, un autore…",
+    placeholder: "Cerca titolo, autore o DOI…",
     searching: "Ricerca in corso…",
     empty: "Nessun risultato.",
     backendOffline: "Il motore di ricerca non risponde. Chiudi e riapri Scraaaper.",
@@ -40,6 +40,19 @@ const UI_TEXT = {
       author: "Autore",
       title: "Titolo",
     },
+    controls: {
+      sort: "Ordina",
+      format: "Formato",
+      languages: "Lingue",
+      allLanguages: "Tutte",
+      selectedLanguages: (count) => `${count} selezionate`,
+      unknownLanguage: "Lingua non indicata",
+    },
+    metadata: {
+      unknownAuthor: "Autore non indicato",
+      unknownYear: "Anno n.d.",
+      unknownFormat: "Formato n.d.",
+    },
     formats: {
       all: "Tutti",
       pdf: "PDF",
@@ -49,10 +62,14 @@ const UI_TEXT = {
       djvu: "DJVU",
       txt: "TXT",
       html: "HTML",
+      fb2: "FB2",
+      docx: "DOCX",
+      chm: "CHM",
+      rar: "RAR",
     },
   },
   en: {
-    placeholder: "Search a title, an author…",
+    placeholder: "Search title, author or DOI…",
     searching: "Searching…",
     empty: "No results.",
     backendOffline: "The search engine is not responding. Quit and reopen Scraaaper.",
@@ -89,6 +106,19 @@ const UI_TEXT = {
       author: "Author",
       title: "Title",
     },
+    controls: {
+      sort: "Sort",
+      format: "Format",
+      languages: "Languages",
+      allLanguages: "All",
+      selectedLanguages: (count) => `${count} selected`,
+      unknownLanguage: "Language not specified",
+    },
+    metadata: {
+      unknownAuthor: "Author not specified",
+      unknownYear: "Year n/a",
+      unknownFormat: "Format n/a",
+    },
     formats: {
       all: "All",
       pdf: "PDF",
@@ -98,11 +128,16 @@ const UI_TEXT = {
       djvu: "DJVU",
       txt: "TXT",
       html: "HTML",
+      fb2: "FB2",
+      docx: "DOCX",
+      chm: "CHM",
+      rar: "RAR",
     },
   },
 };
 
 const SOURCE_LABELS = {
+  doi: "DOI",
   annasarchive: "Anna's Archive",
   archive: "Internet Archive",
   bdebooks: "BDE Books",
@@ -125,6 +160,8 @@ const SOURCE_LABELS = {
   wikisource: "Wikisource",
   zlib: "Z-Library",
 };
+
+const NAV_SOURCE_KEYS = Object.keys(SOURCE_LABELS).filter((key) => key !== "doi");
 
 async function searchSource(sourceKey, query, signal) {
   const params = new URLSearchParams({ source: sourceKey, q: query, lang: currentLang });
@@ -191,13 +228,15 @@ const jstorConnect = document.getElementById("jstorConnect");
 const jstorVerify = document.getElementById("jstorVerify");
 const jstorSearch = document.getElementById("jstorSearch");
 
-let activeSources = new Set(Object.keys(SOURCE_LABELS));
+let activeSources = new Set(NAV_SOURCE_KEYS);
 let currentController = null;
 let debounceTimer = null;
 let lastResults = [];
 let lastFailedSources = [];
 let currentSort = "relevance";
 let currentFormat = "all";
+let selectedLanguages = new Set();
+let lastExecutedQuery = "";
 let currentLang = localStorage.getItem("reading-lang") || "it";
 let searchInProgress = false;
 let jstorInstitutionalAccess = false;
@@ -375,14 +414,25 @@ function inferFormat(item) {
   return null;
 }
 
-function buildMetaLine(item) {
-  const authorPart = item.author ? String(item.author).trim() : "";
-  const details = [];
-  if (item.year) details.push(String(item.year));
+function buildResultLine(item, isShortcut) {
+  if (isShortcut) return `<strong class="result-title">${escapeHtml(item.title || "Senza titolo")}</strong>`;
+  const text = UI_TEXT[currentLang].metadata;
+  const author = String(item.author || "").trim() || text.unknownAuthor;
+  const compactAuthor = author.length > 72
+    ? `${author.slice(0, 68).replace(/[,;]\s*[^,;]*$/, "").trim()}, et al.`
+    : author;
+  const year = String(item.year || "").trim() || text.unknownYear;
   const format = inferFormat(item);
-  if (format) details.push(format.toUpperCase());
-  const detailsText = details.length ? ` · ${escapeHtml(details.join(" · "))}` : "";
-  return authorPart ? `${escapeHtml(authorPart)}${detailsText}` : `${escapeHtml(details.join(" · "))}`;
+  const formatLabel = format ? format.toUpperCase() : text.unknownFormat;
+  return `
+    <span class="result-author" title="${escapeHtml(author)}">${escapeHtml(compactAuthor)}</span>
+    <span class="result-separator" aria-hidden="true">–</span>
+    <strong class="result-title">${escapeHtml(item.title || "Senza titolo")}</strong>
+    <span class="result-separator" aria-hidden="true">–</span>
+    <span class="result-year">${escapeHtml(year)}</span>
+    <span class="result-separator" aria-hidden="true">–</span>
+    <span class="result-format">${escapeHtml(formatLabel)}</span>
+  `;
 }
 
 function renderCard(item) {
@@ -391,7 +441,7 @@ function renderCard(item) {
   const coverHtml = item.cover
     ? `<img src="${escapeHtml(item.cover)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<span class=&quot;placeholder&quot;>${escapeHtml(item.title)}</span>'" />`
     : `<span class="placeholder">${isShortcut ? "🔎" : escapeHtml(item.title)}</span>`;
-  const metaText = buildMetaLine(item);
+  const resultLine = buildResultLine(item, isShortcut);
 
   return `
     <a class="card${isShortcut ? " card-shortcut" : ""}" data-source="${escapeHtml(item.source)}" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">
@@ -399,8 +449,7 @@ function renderCard(item) {
         <span class="source-tag">${escapeHtml(SOURCE_LABELS[item.source] || item.source)}${escapeHtml(modeSuffix)}</span>
         ${coverHtml}
       </div>
-      <div class="title">${escapeHtml(item.title || "Senza titolo")}</div>
-      <div class="author">${metaText}</div>
+      <div class="result-line">${resultLine}</div>
     </a>
   `;
 }
@@ -447,7 +496,7 @@ function isDisplayableResult(item) {
 }
 
 function getVisibleResults() {
-  const filteredBySource = lastResults.filter((r) => activeSources.has(r.source));
+  const filteredBySource = lastResults.filter((r) => r.source === "doi" || activeSources.has(r.source));
   const displayable = filteredBySource.filter(isDisplayableResult);
   const genuine = displayable.filter(isGenuineResult);
   const shortcuts = displayable.filter((r) => !isGenuineResult(r));
@@ -455,9 +504,16 @@ function getVisibleResults() {
   const filteredByFormat = currentFormat === "all"
     ? withFormats
     : withFormats.filter((r) => inferFormat(r) === currentFormat);
+  const filteredByLanguage = filteredByFormat.filter((r) => window.ScraaaperMetadata.matchesLanguages(r, selectedLanguages));
   // shortcut cards ("search on X") have no real file format, only show them in the "all" view
-  const visibleShortcuts = currentFormat === "all" ? shortcuts : [];
-  return sortResults([...filteredByFormat, ...visibleShortcuts]);
+  const visibleShortcuts = currentFormat === "all" && selectedLanguages.size === 0 ? shortcuts : [];
+  return sortResults([...filteredByLanguage, ...visibleShortcuts]);
+}
+
+function getFilterableResults() {
+  return lastResults
+    .filter((r) => r.source === "doi" || activeSources.has(r.source))
+    .filter(isGenuineResult);
 }
 
 function renderResultControls() {
@@ -466,6 +522,34 @@ function renderResultControls() {
     resultControls.innerHTML = "";
     return;
   }
+
+  const languageMenuWasOpen = resultControls.querySelector(".language-filter")?.open === true;
+  const filterableResults = getFilterableResults();
+  const availableFormats = new Set(filterableResults.map(inferFormat).filter(Boolean));
+  const availableLanguages = window.ScraaaperMetadata.availableLanguageCodes(filterableResults);
+  if (!searchInProgress) {
+    selectedLanguages = new Set([...selectedLanguages].filter((code) => availableLanguages.has(code)));
+  }
+  const languageCounts = new Map();
+  filterableResults.forEach((item) => {
+    window.ScraaaperMetadata.itemLanguages(item).forEach((code) => {
+      languageCounts.set(code, (languageCounts.get(code) || 0) + 1);
+    });
+  });
+  const languageOptions = window.ScraaaperMetadata.languageOptions(
+    filterableResults,
+    currentLang,
+    UI_TEXT[currentLang].controls.unknownLanguage
+  );
+  const selectedLabel = selectedLanguages.size === 0
+    ? UI_TEXT[currentLang].controls.allLanguages
+    : selectedLanguages.size === 1
+      ? window.ScraaaperMetadata.languageName(
+        [...selectedLanguages][0],
+        currentLang,
+        UI_TEXT[currentLang].controls.unknownLanguage
+      )
+      : UI_TEXT[currentLang].controls.selectedLanguages(selectedLanguages.size);
 
   const sortButtons = [
     { key: "relevance", label: UI_TEXT[currentLang].sort.relevance },
@@ -482,14 +566,49 @@ function renderResultControls() {
     { key: "djvu", label: UI_TEXT[currentLang].formats.djvu },
     { key: "txt", label: UI_TEXT[currentLang].formats.txt },
     { key: "html", label: UI_TEXT[currentLang].formats.html },
+    { key: "fb2", label: UI_TEXT[currentLang].formats.fb2 },
+    { key: "docx", label: UI_TEXT[currentLang].formats.docx },
+    { key: "chm", label: UI_TEXT[currentLang].formats.chm },
+    { key: "rar", label: UI_TEXT[currentLang].formats.rar },
   ];
 
   resultControls.innerHTML = `
-    <div class="control-group">
-      ${sortButtons.map((opt) => `<button class="control-btn ${currentSort === opt.key ? "active" : ""}" data-sort="${opt.key}" type="button">${escapeHtml(opt.label)}</button>`).join("")}
+    <div class="control-section">
+      <span class="control-label">${escapeHtml(UI_TEXT[currentLang].controls.sort)}</span>
+      <div class="control-group">
+        ${sortButtons.map((opt) => `<button class="control-btn ${currentSort === opt.key ? "active" : ""}" data-sort="${opt.key}" type="button">${escapeHtml(opt.label)}</button>`).join("")}
+      </div>
     </div>
-    <div class="control-group">
-      ${formatButtons.map((opt) => `<button class="control-btn ${currentFormat === opt.key ? "active" : ""}" data-format="${opt.key}" type="button">${escapeHtml(opt.label)}</button>`).join("")}
+    <div class="control-section control-section-separated">
+      <span class="control-label">${escapeHtml(UI_TEXT[currentLang].controls.format)}</span>
+      <div class="control-group">
+        ${formatButtons.map((opt) => {
+          const disabled = opt.key !== "all" && !availableFormats.has(opt.key);
+          return `<button class="control-btn ${currentFormat === opt.key ? "active" : ""}" data-format="${opt.key}" type="button" ${disabled ? "disabled" : ""}>${escapeHtml(opt.label)}</button>`;
+        }).join("")}
+      </div>
+    </div>
+    <div class="control-section control-section-separated">
+      <span class="control-label">${escapeHtml(UI_TEXT[currentLang].controls.languages)}</span>
+      <details class="language-filter" ${languageMenuWasOpen ? "open" : ""}>
+        <summary class="control-btn language-summary">
+          <span>${escapeHtml(selectedLabel)}</span><span class="language-chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div class="language-menu" role="group" aria-label="${escapeHtml(UI_TEXT[currentLang].controls.languages)}">
+          <button class="language-clear ${selectedLanguages.size === 0 ? "active" : ""}" data-clear-languages type="button">
+            ${escapeHtml(UI_TEXT[currentLang].controls.allLanguages)}
+          </button>
+          <div class="language-options">
+            ${languageOptions.map((option) => `
+              <label class="language-option ${option.available ? "" : "unavailable"}">
+                <input type="checkbox" data-language="${escapeHtml(option.code)}" ${selectedLanguages.has(option.code) ? "checked" : ""} ${option.available ? "" : "disabled"} />
+                <span>${escapeHtml(option.name)}</span>
+                <small>${option.available ? languageCounts.get(option.code) || 0 : "—"}</small>
+              </label>
+            `).join("")}
+          </div>
+        </div>
+      </details>
     </div>
   `;
 }
@@ -513,7 +632,9 @@ async function runSearch(query) {
   currentController = controller;
   const { signal } = controller;
 
-  if (!query.trim()) {
+  const normalizedQuery = query.trim();
+  if (!normalizedQuery) {
+    lastExecutedQuery = "";
     lastResults = [];
     lastFailedSources = [];
     status.textContent = "";
@@ -523,13 +644,24 @@ async function runSearch(query) {
     return;
   }
 
+  if (normalizedQuery !== lastExecutedQuery) {
+    selectedLanguages = new Set();
+    currentFormat = "all";
+    lastExecutedQuery = normalizedQuery;
+  }
+
+  const isDoiSearch = Boolean(window.ScraaaperMetadata.normalizeDoi(normalizedQuery));
+  const sourceKeys = [
+    ...(isDoiSearch ? ["doi"] : []),
+    ...NAV_SOURCE_KEYS.filter((key) => activeSources.has(key)),
+  ];
+
   setSearchInProgress(true);
-  status.textContent = UI_TEXT[currentLang].progress(0, activeSources.size, 0);
+  status.textContent = UI_TEXT[currentLang].progress(0, sourceKeys.length, 0);
   renderResultControls();
   grid.innerHTML = "";
   updateJstorPanel();
 
-  const sourceKeys = Object.keys(FETCHERS).filter((key) => activeSources.has(key));
   const resultsBySource = {};
   const failedSources = [];
   let backendUnavailable = false;
@@ -630,6 +762,14 @@ grid.addEventListener("click", (event) => {
 });
 
 resultControls.addEventListener("click", (e) => {
+  const clearLanguages = e.target.closest("[data-clear-languages]");
+  if (clearLanguages) {
+    selectedLanguages = new Set();
+    renderResults();
+    resultControls.querySelector(".language-filter")?.setAttribute("open", "");
+    return;
+  }
+
   const sortBtn = e.target.closest("[data-sort]");
   if (sortBtn) {
     currentSort = sortBtn.dataset.sort;
@@ -644,11 +784,23 @@ resultControls.addEventListener("click", (e) => {
   }
 });
 
+resultControls.addEventListener("change", (e) => {
+  const languageInput = e.target.closest("[data-language]");
+  if (!languageInput || languageInput.disabled) return;
+  if (languageInput.checked) {
+    selectedLanguages.add(languageInput.dataset.language);
+  } else {
+    selectedLanguages.delete(languageInput.dataset.language);
+  }
+  renderResults();
+  resultControls.querySelector(".language-filter")?.setAttribute("open", "");
+});
+
 sourcesNav.addEventListener("click", (e) => {
   const btn = e.target.closest(".chip");
   if (!btn) return;
   const source = btn.dataset.source;
-  const allSourceKeys = Object.keys(SOURCE_LABELS);
+  const allSourceKeys = NAV_SOURCE_KEYS;
   const allSelected = allSourceKeys.every((key) => activeSources.has(key));
 
   if (source === "all") {
