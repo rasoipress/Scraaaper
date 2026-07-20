@@ -16,8 +16,10 @@ Scraaaper è gratuito e non usa un certificato di firma commerciale, quindi al p
 
 Scarica il DMG giusto per il tuo Mac: `arm64` per i Mac con chip Apple Silicon, `x64` per i Mac Intel. Trascina **Scraaaper** nella cartella Applicazioni.
 
-Anche qui l'app non è firmata, quindi al primo avvio serve un passaggio in più: clic destro sull'icona, **Apri**, e conferma. Se compare un errore del tipo "file danneggiato", premi Annulla e vai in **Impostazioni di Sistema → Privacy e sicurezza**; scorri fino in fondo e conferma con **Apri comunque**.
-Altrimenti apri il **Terminale → scrivi xattr -cr "drag and drop dell'app" → invio.** (dopo il codice lasciare uno spazio e spostare l'app dentro il terminale, poi premere invio). In questo modo verrà tolta la quarantena dall'app e si aprirà normalmente.
+Anche qui l'app non è firmata, quindi al primo avvio serve un passaggio in più: 
+- clic destro sull'icona, **Apri**, e conferma.
+- Se compare un errore del tipo "file danneggiato", premi Annulla e vai in **Impostazioni di Sistema → Privacy e sicurezza**; scorri fino in fondo e conferma con **Apri comunque**.
+- Altrimenti apri il **Terminale → scrivi xattr -cr "drag and drop dell'app" → invio.** (dopo il codice lasciare uno spazio e spostare l'app dentro il terminale, poi premere invio). In questo modo verrà tolta la quarantena dall'app che si aprirà normalmente.
 
 ## Aggiornamenti
 
