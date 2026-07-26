@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#111111" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data: https:; style-src 'self'; script-src 'self' 'unsafe-inline'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" />
 <title>Scraaaper — ebook search</title>
-<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="style.css?v=8" />
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
 </head>
@@ -31,30 +31,7 @@
       </div>
     </header>
 
-    <nav class="sources" id="sources">
-      <button class="chip active" data-source="all">Tutte</button>
-      <button class="chip active" data-source="annasarchive">Anna's Archive</button>
-      <button class="chip active" data-source="archive">Internet Archive</button>
-      <button class="chip active" data-source="bdebooks">BDE Books</button>
-      <button class="chip active" data-source="bookracy">Bookracy</button>
-      <button class="chip active" data-source="booksee">Booksee</button>
-      <button class="chip active" data-source="ebookoz">Ebookoz</button>
-      <button class="chip active" data-source="freebannedbooks">FreeBannedBooks</button>
-      <button class="chip active" data-source="gutenberg">Project Gutenberg</button>
-      <button class="chip active" data-source="inventaire">Inventaire</button>
-      <button class="chip active" data-source="jstor">JSTOR</button>
-      <button class="chip active" data-source="liber3">Liber3</button>
-      <button class="chip active" data-source="libgen">LibGen</button>
-      <button class="chip active" data-source="mobilism">Mobilism Forum</button>
-      <button class="chip active" data-source="monoskop">Monoskop</button>
-      <button class="chip active" data-source="myanonamouse">MyAnonamouse</button>
-      <button class="chip active" data-source="openlibrary">Open Library</button>
-      <button class="chip active" data-source="scribd">Scribd</button>
-      <button class="chip active" data-source="standardebooks">Standard Ebooks</button>
-      <button class="chip active" data-source="vkbookstagram">VK Bookstagram</button>
-      <button class="chip active" data-source="wikisource">Wikisource</button>
-      <button class="chip active" data-source="zlib">Z-Library</button>
-    </nav>
+    <nav class="sources" id="sources" aria-label="Fonti di ricerca"></nav>
 
     <section id="jstorAccess" class="jstor-access" aria-live="polite" hidden>
       <div class="jstor-copy">
@@ -70,6 +47,7 @@
       <div class="jstor-actions">
         <button id="jstorConnect" class="pill-btn" type="button">Collega università</button>
         <button id="jstorVerify" class="pill-btn" type="button">Verifica accesso</button>
+        <button id="jstorDisconnect" class="pill-btn" type="button" hidden>Disconnetti</button>
         <button id="jstorSearch" class="pill-btn" type="button">Cerca su JSTOR</button>
       </div>
     </section>
@@ -90,9 +68,10 @@
     </footer>
   </div>
 
-  <script src="result-metadata.js"></script>
-  <script src="search-results.js"></script>
-  <script src="app.js"></script>
+  <script src="source-catalog.js?v=8"></script>
+  <script src="result-metadata.js?v=8"></script>
+  <script src="search-results.js?v=8"></script>
+  <script src="app.js?v=8"></script>
   <script>
     const isLocalHost = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(window.location.hostname);
     if ('serviceWorker' in navigator && !isLocalHost) {

@@ -70,13 +70,37 @@ SOURCE_LABELS = {
     "libgen": "LibGen",
     "mobilism": "Mobilism Forum",
     "monoskop": "Monoskop",
-    "myanonamouse": "MyAnonamouse",
     "openlibrary": "Open Library",
     "scribd": "Scribd",
     "standardebooks": "Standard Ebooks",
-    "vkbookstagram": "VK Bookstagram",
     "wikisource": "Wikisource",
+    "wikibooks": "Wikibooks",
     "zlib": "Z-Library",
+    "unglue": "Unglue.it",
+    "pagebypage": "Page by Page Books",
+    "manybooks": "ManyBooks",
+    "justfreebooks": "JustFreeBooks",
+    "globalgrey": "Global Grey",
+    "literature": "Literature Network",
+    "dpla": "DPLA",
+    "fadedpage": "Faded Page",
+    "ebookmecca": "E-Book Mecca",
+    "ebookzy": "Ebookzy",
+    "planetebook": "Planet eBook",
+    "loyalbooks": "Loyal Books",
+    "planetpublish": "Planet Publish",
+    "baen": "Baen",
+    "bythefireplace": "By the Fireplace",
+    "digilibraries": "DigiLibraries",
+    "exclassics": "Ex-Classics",
+    "hplovecraft": "H. P. Lovecraft Archive",
+    "sherlock": "Sherlock Holmes Canon",
+    "grimm": "GrimmStories",
+    "andersen": "AndersenStories",
+    "publicdomainreview": "Public Domain Review",
+    "core": "CORE",
+    "s3pdf": "AWS S3 PDF",
+    "googledrive": "Google Drive",
 }
 
 
@@ -112,10 +136,37 @@ INDEX_SCOPES = {
     "liber3": ["liber3.eth.limo"],
     "libgen": ["libgen.gl"],
     "mobilism": ["forum.mobilism.org"],
-    "myanonamouse": ["myanonamouse.net"],
     "scribd": ["scribd.com/document"],
-    "vkbookstagram": ["vk.com/bookstagram_eng"],
     "zlib": ["z-lib.gd", "z-library.sk"],
+    "core": ["core.ac.uk/works"],
+}
+
+# Sources without a stable public API are exposed as transparent, pre-filled
+# searches. They never masquerade as catalogue records and always open the
+# original site (or a search-engine site query) in the user's browser.
+SITE_SEARCH_SCOPES = {
+    "unglue": "unglue.it",
+    "pagebypage": "pagebypagebooks.com",
+    "manybooks": "manybooks.net",
+    "justfreebooks": "justfreebooks.info",
+    "globalgrey": "globalgreyebooks.com",
+    "literature": "online-literature.com",
+    "dpla": "dp.la",
+    "fadedpage": "fadedpage.com",
+    "ebookmecca": "ebook-mecca.com",
+    "planetebook": "planetebook.com",
+    "loyalbooks": "loyalbooks.com",
+    "planetpublish": "planetpublish.com",
+    "baen": "baen.com",
+    "ebookzy": "ebookzy.com",
+    "bythefireplace": "bythefireplace.com",
+    "digilibraries": "digilibraries.com",
+    "exclassics": "exclassics.com",
+    "hplovecraft": "hplovecraft.com",
+    "sherlock": "sherlock-holm.es",
+    "grimm": "grimmstories.com",
+    "andersen": "andersenstories.com",
+    "publicdomainreview": "publicdomainreview.org",
 }
 
 
@@ -465,6 +516,9 @@ def search_mediawiki(source: str, query: str, lang: str) -> list[dict[str, Any]]
     if source == "wikisource":
         host = "it.wikisource.org" if lang == "it" else "en.wikisource.org"
         endpoint = f"https://{host}/w/api.php"
+    elif source == "wikibooks":
+        host = "it.wikibooks.org" if lang == "it" else "en.wikibooks.org"
+        endpoint = f"https://{host}/w/api.php"
     else:
         endpoint = "https://monoskop.org/api.php"
     params = urlencode(
@@ -493,7 +547,7 @@ def search_mediawiki(source: str, query: str, lang: str) -> list[dict[str, Any]]
                 page.get("fullurl") or endpoint,
                 cover=(page.get("thumbnail") or {}).get("source"),
                 file_type="html",
-                languages=[lang] if source == "wikisource" else None,
+                languages=[lang] if source in {"wikisource", "wikibooks"} else None,
             )
         )
     return dedupe(results)
@@ -882,6 +936,54 @@ def indexed_search(source: str, query: str) -> list[dict[str, Any]]:
     ]
     return dedupe(relevant)
 
+def site_search_shortcut(source: str, query: str, lang: str) -> list[dict[str, Any]]:
+    domain = SITE_SEARCH_SCOPES[source]
+    expression = f'site:{domain} "{query}"'
+    url = f"https://www.google.com/search?{urlencode({'q': expression})}"
+    prefix = "Search on" if lang == "en" else "Cerca su"
+    return [
+        item(
+            source,
+            f'{prefix} {SOURCE_LABELS[source]}: “{query}”',
+            url,
+            author=f"{prefix} {SOURCE_LABELS[source]}",
+            search_mode="shortcut",
+        )
+    ]
+
+
+def search_google_drive(query: str, lang: str) -> list[dict[str, Any]]:
+    prefix = "Search on" if lang == "en" else "Cerca su"
+    results = []
+    for file_type in ("pdf", "epub"):
+        expression = f'site:drive.google.com "{query}" filetype:{file_type}'
+        results.append(
+            item(
+                "googledrive",
+                f'{prefix} Google Drive: “{query}” ({file_type.upper()})',
+                f"https://www.google.com/search?{urlencode({'q': expression})}",
+                author=f"{prefix} Google Drive",
+                file_type=file_type,
+                search_mode="shortcut",
+            )
+        )
+    return results
+
+
+def search_s3_pdf(query: str, lang: str) -> list[dict[str, Any]]:
+    prefix = "Search on" if lang == "en" else "Cerca su"
+    expression = f'site:s3.amazonaws.com "{query}" filetype:pdf'
+    return [
+        item(
+            "s3pdf",
+            f'{prefix} AWS S3: “{query}” (PDF)',
+            f"https://www.google.com/search?{urlencode({'q': expression})}",
+            author=f"{prefix} AWS S3",
+            file_type="pdf",
+            search_mode="shortcut",
+        )
+    ]
+
 
 NativeSearch = Callable[[str, str], list[dict[str, Any]]]
 
@@ -901,6 +1003,9 @@ NATIVE_SEARCHERS: dict[str, NativeSearch] = {
     "scribd": search_scribd,
     "standardebooks": search_standardebooks,
     "wikisource": lambda query, lang: search_mediawiki("wikisource", query, lang),
+    "wikibooks": lambda query, lang: search_mediawiki("wikibooks", query, lang),
+    "googledrive": search_google_drive,
+    "s3pdf": search_s3_pdf,
 }
 
 
@@ -933,7 +1038,11 @@ def search_source(source: str, query: str, lang: str) -> dict[str, Any]:
         except Exception as exc:
             index_error = exc
 
-    if not results and searcher is None and source not in INDEX_SCOPES:
+    if not results and source in SITE_SEARCH_SCOPES:
+        results = site_search_shortcut(source, query, lang)
+        mode = "shortcut"
+
+    if not results and searcher is None and source not in INDEX_SCOPES and source not in SITE_SEARCH_SCOPES:
         raise SearchError(f"sorgente non configurata: {source}")
     if native_error and index_error:
         raise SearchError(f"ricerca nativa: {native_error}; indice web: {index_error}")

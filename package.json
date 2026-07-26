@@ -1,6 +1,6 @@
 {
   "name": "scraaaper-desktop",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Ricerca libri e documenti in cataloghi e archivi online su macOS e Windows",
   "main": "desktop/main.js",
   "repository": {
@@ -24,6 +24,7 @@
   "build": {
     "appId": "app.scraaaper.desktop",
     "productName": "Scraaaper",
+    "afterPack": "scripts/after-pack.mjs",
     "asar": true,
     "directories": {
       "output": "release",
@@ -44,9 +45,9 @@
     ],
     "artifactName": "Scraaaper-${version}-${os}-${arch}.${ext}",
     "mac": {
-      "icon": "build/icon.svg",
+      "icon": "build/icon.icns",
       "category": "public.app-category.reference",
-      "identity": null,
+      "identity": "-",
       "hardenedRuntime": false,
       "target": [
         "dmg",
@@ -69,7 +70,7 @@
       ]
     },
     "win": {
-      "icon": "build/icon",
+      "icon": "build/icon.ico",
       "signExecutable": false,
       "target": [
         "nsis",

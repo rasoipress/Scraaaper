@@ -7,6 +7,7 @@ const {
   itemLanguages,
   availableLanguageCodes,
   matchesLanguages,
+  languageName,
   languageOptions,
 } = require("../result-metadata");
 
@@ -36,4 +37,8 @@ test("rende disponibili solo le lingue presenti nei risultati", () => {
   const options = languageOptions(results, "it", "Lingua non indicata");
   assert.equal(options.find((option) => option.code === "it").available, true);
   assert.equal(options.find((option) => option.code === "fr").available, false);
+});
+
+test("espone il nome localizzato usato dal filtro dopo la selezione", () => {
+  assert.match(languageName("en", "it", "Lingua non indicata").toLowerCase(), /inglese|english/);
 });

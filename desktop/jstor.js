@@ -38,6 +38,71 @@ function accessUpdateFromPageText(value, { allowDisconnected = false } = {}) {
   return null;
 }
 
+const DISCIPLINE_TERMS = {
+  architecture: ["architecture", "architectural", "built environment"],
+  anthropology: ["anthropology", "anthropological", "ethnography"],
+  archaeology: ["archaeology", "archaeological"],
+  art: ["art history", "visual culture", "museum"],
+  design: ["design"],
+  philosophy: ["philosophy", "philosophical"],
+  geography: ["geography", "geographical", "landscape"],
+  literature: ["literature", "literary", "poetry"],
+  history: ["history", "historical"],
+  sociology: ["sociology", "sociological"],
+  urban: ["urban", "cities", "city planning"],
+};
+
+function clean(value, limit = 300) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, limit);
+}
+
+function normalizeJstorSearchRecords(records) {
+  const results = [];
+  const seen = new Set();
+  for (const record of Array.isArray(records) ? records : []) {
+    const title = clean(record?.title, 240);
+    let link;
+    try {
+      const parsed = new URL(record?.link || "", JSTOR_HOME_URL);
+      if (!isJstorUrl(parsed.toString()) || !/\/stable\//.test(parsed.pathname)) continue;
+      parsed.search = "";
+      parsed.hash = "";
+      link = parsed.toString();
+    } catch {
+      continue;
+    }
+    if (!title || seen.has(link)) continue;
+    seen.add(link);
+    const context = clean(record?.context, 2000);
+    const year = context.match(/(?:^|\D)((?:18|19|20)\d{2})(?:\D|$)/)?.[1] || "";
+    const doi = context.match(/\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i)?.[0]?.replace(/[.,;:]$/, "") || "";
+    const author = (
+      context.match(/\b(?:Author|Authors|By)\s*:?\s*([^\n|·]{2,180})/i)?.[1]
+      || clean(record?.author, 180)
+    );
+    const haystack = `${title} ${context}`.toLowerCase();
+    const disciplines = Object.entries(DISCIPLINE_TERMS)
+      .filter(([, terms]) => terms.some((term) => haystack.includes(term)))
+      .map(([discipline]) => discipline);
+    results.push({
+      source: "jstor",
+      title,
+      author: clean(author, 180),
+      year,
+      cover: null,
+      link,
+      fileType: null,
+      languages: [],
+      doi: doi || null,
+      disciplines,
+      publication: clean(record?.publication, 180),
+      searchMode: "authenticated",
+    });
+    if (results.length >= 24) break;
+  }
+  return results;
+}
+
 module.exports = {
   JSTOR_HOME_URL,
   JSTOR_INSTITUTION_URL,
@@ -45,4 +110,5 @@ module.exports = {
   accessUpdateFromPageText,
   isJstorUrl,
   jstorSearchUrl,
+  normalizeJstorSearchRecords,
 };

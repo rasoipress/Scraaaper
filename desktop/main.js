@@ -5,6 +5,7 @@ const { spawn } = require("node:child_process");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const readline = require("node:readline");
+const { setTimeout: delay } = require("node:timers/promises");
 const {
   JSTOR_HOME_URL,
   JSTOR_INSTITUTION_URL,
@@ -12,6 +13,7 @@ const {
   accessUpdateFromPageText,
   isJstorUrl,
   jstorSearchUrl,
+  normalizeJstorSearchRecords,
 } = require("./jstor");
 const { assetForCurrentPlatform } = require("./release");
 const { isNewerVersion } = require("./version");
@@ -31,6 +33,7 @@ let lastNotifiedVersion = "";
 let jstorInstitutionalAccess = false;
 let jstorVerifiedAt = null;
 let jstorChecking = false;
+let jstorConnectionState = "disconnected";
 let jstorConnectionFlowActive = false;
 let jstorVerificationTimer = null;
 const configuredJstorWindows = new WeakSet();
@@ -59,6 +62,7 @@ function publicJstorStatus() {
     available: true,
     institutionalAccess: jstorInstitutionalAccess,
     checking: jstorChecking,
+    state: jstorChecking ? "checking" : jstorConnectionState,
     verifiedAt: jstorVerifiedAt,
   };
 }
@@ -80,9 +84,11 @@ async function loadJstorState() {
     const saved = JSON.parse(await fs.readFile(jstorStatePath(), "utf8"));
     jstorInstitutionalAccess = saved.institutionalAccess === true;
     jstorVerifiedAt = typeof saved.verifiedAt === "string" ? saved.verifiedAt : null;
+    jstorConnectionState = jstorInstitutionalAccess ? "connected" : "disconnected";
   } catch {
     jstorInstitutionalAccess = false;
     jstorVerifiedAt = null;
+    jstorConnectionState = "disconnected";
   }
 }
 
@@ -91,11 +97,26 @@ async function setJstorAccess(institutionalAccess) {
     return publicJstorStatus();
   }
   jstorInstitutionalAccess = institutionalAccess;
+  jstorConnectionState = institutionalAccess ? "connected" : "disconnected";
   jstorChecking = false;
   jstorConnectionFlowActive = false;
   clearTimeout(jstorVerificationTimer);
   jstorVerificationTimer = null;
   jstorVerifiedAt = institutionalAccess ? new Date().toISOString() : null;
+  await fs.writeFile(jstorStatePath(), JSON.stringify(publicJstorStatus()), {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  notifyJstorStatus();
+  return publicJstorStatus();
+}
+
+async function setJstorConnectionState(state) {
+  jstorConnectionState = state;
+  if (state !== "connected") jstorInstitutionalAccess = false;
+  jstorChecking = false;
+  jstorConnectionFlowActive = false;
+  jstorVerifiedAt = state === "connected" ? new Date().toISOString() : null;
   await fs.writeFile(jstorStatePath(), JSON.stringify(publicJstorStatus()), {
     encoding: "utf8",
     mode: 0o600,
@@ -232,6 +253,79 @@ async function openJstorWindow(url = JSTOR_INSTITUTION_URL) {
   return publicJstorStatus();
 }
 
+async function searchJstorInAuthenticatedSession(query) {
+  const normalized = String(query || "").trim().slice(0, 300);
+  if (!normalized) return [];
+  if (!jstorInstitutionalAccess) {
+    const error = new Error("Collega prima JSTOR tramite università o biblioteca.");
+    error.code = "JSTOR_AUTH_REQUIRED";
+    throw error;
+  }
+
+  const searchWindow = new BrowserWindow({
+    width: 1100,
+    height: 820,
+    show: false,
+    backgroundColor: "#ffffff",
+    webPreferences: jstorWebPreferences(),
+  });
+  searchWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+
+  try {
+    await searchWindow.loadURL(jstorSearchUrl(normalized));
+    let lastPageText = "";
+    for (const wait of [350, 900, 1_800, 2_800]) {
+      await delay(wait);
+      if (searchWindow.isDestroyed()) break;
+      const snapshot = await searchWindow.webContents.executeJavaScript(`(() => {
+        const pageText = document.documentElement?.innerText || "";
+        const anchors = [...document.querySelectorAll('a[href*="/stable/"]')];
+        const records = anchors.map((anchor) => {
+          const container = anchor.closest(
+            '[data-testid*="search-result"], [class*="search-result"], [class*="result-item"], article, li'
+          ) || anchor.parentElement;
+          const titleNode = anchor.querySelector('h1, h2, h3, h4')
+            || container?.querySelector('h1 a[href*="/stable/"], h2 a[href*="/stable/"], h3 a[href*="/stable/"]')
+            || anchor;
+          const authorNode = container?.querySelector(
+            '[data-testid*="author"], [class*="author"], [rel="author"]'
+          );
+          const publicationNode = container?.querySelector(
+            '[data-testid*="journal"], [data-testid*="publication"], [class*="journal"], [class*="publication"]'
+          );
+          return {
+            title: titleNode?.textContent || "",
+            link: anchor.href,
+            author: authorNode?.textContent || "",
+            publication: publicationNode?.textContent || "",
+            context: container?.innerText || "",
+          };
+        });
+        return { pageText: pageText.slice(0, 20000), records };
+      })()`);
+      lastPageText = snapshot?.pageText || "";
+      const results = normalizeJstorSearchRecords(snapshot?.records);
+      if (results.length) return results;
+    }
+
+    const access = accessStateFromPageText(lastPageText);
+    if (access.conclusive && !access.institutionalAccess) {
+      await setJstorConnectionState("expired");
+      const error = new Error("La sessione JSTOR è scaduta.");
+      error.code = "JSTOR_AUTH_REQUIRED";
+      throw error;
+    }
+    return [];
+  } catch (error) {
+    if (error?.code === "JSTOR_AUTH_REQUIRED") throw error;
+    jstorConnectionState = "error";
+    notifyJstorStatus();
+    throw error;
+  } finally {
+    if (!searchWindow.isDestroyed()) searchWindow.destroy();
+  }
+}
+
 function registerJstorIntegration() {
   const jstorSession = session.fromPartition(JSTOR_PARTITION);
   jstorSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
@@ -242,11 +336,19 @@ function registerJstorIntegration() {
     return openJstorWindow(JSTOR_INSTITUTION_URL);
   });
   ipcMain.handle("jstor:verify", () => verifyJstorAccessAtHome());
+  ipcMain.handle("jstor:disconnect", async () => {
+    await jstorSession.clearStorageData({
+      storages: ["cookies", "localstorage", "indexdb", "serviceworkers", "cachestorage"],
+    });
+    if (jstorWindow && !jstorWindow.isDestroyed()) jstorWindow.close();
+    return setJstorConnectionState("disconnected");
+  });
   ipcMain.handle("jstor:search", (_event, query) => {
     const normalized = String(query || "").trim();
     if (!normalized) throw new Error("Inserisci prima un titolo, un autore o un DOI.");
     return openJstorWindow(jstorSearchUrl(normalized));
   });
+  ipcMain.handle("jstor:search-results", (_event, query) => searchJstorInAuthenticatedSession(query));
   ipcMain.handle("jstor:open", (_event, url) => openJstorWindow(url));
 }
 

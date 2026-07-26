@@ -1,6 +1,6 @@
 # Scraaaper
 
-Scraaaper è un'app desktop gratuita per macOS e Windows che cerca libri e documenti nelle fonti che scegli tu. Il motore di ricerca è dentro l'app: niente Python, niente Terminale, niente server esterni, nessun abbonamento.
+Scraaaper è un'app desktop gratuita per macOS e Windows che cerca libri, articoli e documenti nelle fonti scelte dall'utente. Il motore di ricerca è incluso nell'app: niente Python, Terminale, server a pagamento o abbonamenti.
 
 ## Installazione
 
@@ -16,10 +16,12 @@ Scraaaper è gratuito e non usa un certificato di firma commerciale, quindi al p
 
 Scarica il DMG giusto per il tuo Mac: `arm64` per i Mac con chip Apple Silicon, `x64` per i Mac Intel. Trascina **Scraaaper** nella cartella Applicazioni.
 
-Anche qui l'app non è firmata, quindi al primo avvio serve un passaggio in più: 
+Le build macOS usano la firma locale gratuita ad hoc, ma non sono notarizzate da Apple. Al primo avvio potrebbe quindi servire un passaggio in più:
+
 - clic destro sull'icona, **Apri**, e conferma.
-- Se compare un errore del tipo "file danneggiato", premi Annulla e vai in **Impostazioni di Sistema → Privacy e sicurezza**; scorri fino in fondo e conferma con **Apri comunque**.
-- Altrimenti apri il **Terminale → scrivi xattr -cr "drag and drop dell'app" → invio.** (dopo il codice lasciare uno spazio e spostare l'app dentro il terminale, poi premere invio). In questo modo verrà tolta la quarantena dall'app che si aprirà normalmente.
+- Se macOS la blocca, vai in **Impostazioni di Sistema → Privacy e sicurezza** e conferma con **Apri comunque**.
+
+Una firma Developer ID e la notarizzazione, necessarie per eliminare stabilmente questi avvisi su tutti i Mac, richiedono un account Apple Developer a pagamento e non sono incluse.
 
 ## Aggiornamenti
 
@@ -31,31 +33,37 @@ Puoi controllare anche manualmente da **Aiuto → Controlla aggiornamenti…**
 
 Le fonti vengono interrogate in parallelo e i risultati compaiono man mano che ciascuna risponde. Durante la ricerca un indicatore discreto mostra quante fonti hanno finito e quanti risultati sono già disponibili. Le fonti più lente continuano a lavorare in sottofondo senza nascondere quello che hai già trovato.
 
+Le fonti sono divise in sezioni richiudibili: **Accesso aperto**, **Fonti esterne**, **Fonti accademiche**, **PDF e documenti** e **Drive pubblici**. Ogni sezione può essere selezionata o azzerata in un solo gesto. Le fonti aperte affidabili sono attive al primo avvio; JSTOR, fonti esterne e Drive pubblici sono disattivati.
+
 ## Metadati, filtri e DOI
 
 Ogni risultato mostra **autore – titolo – anno – formato**. Quando una fonte non fornisce un dato, Scraaaper lo lascia vuoto invece di inventarlo.
 
-I controlli di ordinamento, formato e lingua sono separati visivamente. Il menu lingua permette la selezione multipla e rende grigie le lingue assenti dai risultati correnti.
+I controlli di ordinamento, formato e lingua sono separati visivamente. Il menu lingua permette la selezione multipla e rende grigie le lingue assenti dai risultati correnti. Sono disponibili anche un intervallo di anni e, quando supportato dai risultati accademici, il filtro multiplo per disciplina.
 
 La stessa barra di ricerca riconosce i DOI nei formati `10.…/…`, `doi:10.…/…` e `https://doi.org/10.…/…`. Per un DOI, Scraaaper interroga le fonti selezionate e in più risolve i metadati direttamente tramite le API pubbliche e gratuite di Crossref e DataCite.
 
 ## Accesso universitario JSTOR
 
-Quando JSTOR è tra le fonti selezionate compare il riquadro **JSTOR per studenti**.
+JSTOR è disattivato al primo avvio. Quando viene selezionato compare il riquadro **JSTOR per studenti**.
 
-**Collega università** apre la pagina ufficiale JSTOR dove scegli il tuo ateneo o la tua biblioteca e accedi con SSO, proxy o il metodo previsto dalla tua istituzione. Il riquadro mostra sempre lo stato corrente — **Non collegato**, **Verifica in corso** o **Collegato** — e ricontrolla JSTOR automaticamente al termine del flusso universitario. Se il portale del tuo ateneo non ti riporta su JSTOR da solo, **Verifica accesso** apre JSTOR nella stessa sessione e aggiorna lo stato.
+**Collega JSTOR** apre la pagina ufficiale dove scegli ateneo o biblioteca e accedi con il metodo previsto dall'istituzione. Il riquadro distingue **Non collegato**, **Collegamento in corso**, **Collegato**, **Sessione scaduta** ed **Errore di collegamento**. Sono disponibili anche **Ricollega** e **Disconnetti**.
 
 Scraaaper non riceve e non salva password, codici di autenticazione o credenziali universitarie. La sessione e i cookie JSTOR restano nel profilo locale dell'app, sul tuo computer.
 
-**Cerca su JSTOR** apre la ricerca completa nella sessione autenticata, e anche i risultati JSTOR presenti nella griglia si aprono nella stessa sessione, così non perdi l'accesso istituzionale.
+Quando la sessione è verificata, Scraaaper esegue la ricerca JSTOR nella stessa sessione e inserisce progressivamente nella griglia i risultati trovati, inclusi titolo, autore, rivista, anno e DOI quando JSTOR li espone. I collegamenti si aprono nella sessione autenticata. Scraaaper non aggira le limitazioni di accesso dell'istituzione.
 
 L'accesso non è obbligatorio: il riquadro resta visibile ma non blocca le ricerche pubbliche. Questa integrazione richiede l'app desktop e non è disponibile nella versione GitHub Pages.
 
 ## Fonti e accesso
 
-Le fonti con API o cataloghi leggibili vengono interrogate direttamente. Quelle protette o senza API vengono cercate tramite un indice web limitato al loro dominio.
+Le fonti con API o cataloghi leggibili vengono interrogate direttamente. Per alcune fonti pubbliche senza un'API stabile Scraaaper prepara invece una ricerca web trasparente limitata al dominio originale. Il risultato rimanda sempre alla pagina di origine.
 
 Scraaaper non aggira login, CAPTCHA o condizioni di accesso dei singoli siti: gli accessi previsti li fai tu, come faresti normalmente. Se una fonte è temporaneamente irraggiungibile l'app te lo dice, senza riempire il vuoto con risultati fittizi.
+
+La voce **Drive pubblici**, quando attivata, prepara due ricerche separate per la frase esatta: `site:drive.google.com "ricerca" filetype:pdf` e `site:drive.google.com "ricerca" filetype:epub`. Non accede a file privati e non elude autorizzazioni.
+
+Il resoconto completo delle integrazioni e delle esclusioni è in [SOURCES.md](SOURCES.md).
 
 ## Sviluppo locale
 

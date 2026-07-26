@@ -7,7 +7,9 @@ contextBridge.exposeInMainWorld("scraaaperDesktop", {
     status: () => ipcRenderer.invoke("jstor:status"),
     connect: () => ipcRenderer.invoke("jstor:connect"),
     verify: () => ipcRenderer.invoke("jstor:verify"),
+    disconnect: () => ipcRenderer.invoke("jstor:disconnect"),
     search: (query) => ipcRenderer.invoke("jstor:search", query),
+    searchResults: (query) => ipcRenderer.invoke("jstor:search-results", query),
     open: (url) => ipcRenderer.invoke("jstor:open", url),
     onStatusChanged: (callback) => {
       const listener = (_event, status) => callback(status);

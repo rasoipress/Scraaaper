@@ -99,6 +99,7 @@
     itemLanguages,
     availableLanguageCodes,
     matchesLanguages,
+    languageName,
     languageOptions,
   };
 }));

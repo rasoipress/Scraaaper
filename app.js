@@ -1,5 +1,6 @@
 const RESULTS_PER_SOURCE = 24;
 const SOURCE_TIMEOUT_MS = 30_000;
+const SOURCE_SLOW_MS = 8_000;
 
 const UI_TEXT = {
   it: {
@@ -15,14 +16,18 @@ const UI_TEXT = {
       disconnected: "Collega università o biblioteca per accedere ai contenuti disponibili.",
       connected: "Accesso universitario rilevato. La sessione resta soltanto su questo computer.",
       checking: "Completa l’accesso nella finestra JSTOR: Scraaaper verificherà automaticamente la sessione.",
+      expired: "La sessione JSTOR è scaduta. Ricollega l’università per continuare.",
       connect: "Collega università",
-      manage: "Verifica o cambia",
+      reconnect: "Ricollega",
       verify: "Verifica accesso",
+      disconnect: "Disconnetti",
       search: "Cerca su JSTOR",
-      error: "Non è stato possibile aprire JSTOR.",
+      error: "JSTOR non ha completato la richiesta.",
       stateConnected: "Collegato",
       stateDisconnected: "Non collegato",
       stateChecking: "Verifica in corso",
+      stateExpired: "Sessione scaduta",
+      stateError: "Errore",
     },
     results: (count, failedSources, hasRealResults) => {
       const base = `${count} risultati`;
@@ -44,6 +49,13 @@ const UI_TEXT = {
       sort: "Ordina",
       format: "Formato",
       languages: "Lingue",
+      disciplines: "Discipline",
+      allDisciplines: "Tutte",
+      selectedDisciplines: (count) => `${count} selezionate`,
+      date: "Data",
+      dateFrom: "Da",
+      dateTo: "A",
+      clear: "Azzera",
       allLanguages: "Tutte",
       selectedLanguages: (count) => `${count} selezionate`,
       unknownLanguage: "Lingua non indicata",
@@ -81,14 +93,18 @@ const UI_TEXT = {
       disconnected: "Connect your university or library to access available content.",
       connected: "Institutional access detected. The session stays only on this computer.",
       checking: "Complete sign-in in the JSTOR window: Scraaaper will verify the session automatically.",
+      expired: "The JSTOR session has expired. Reconnect your institution to continue.",
       connect: "Connect university",
-      manage: "Verify or change",
+      reconnect: "Reconnect",
       verify: "Verify access",
+      disconnect: "Disconnect",
       search: "Search JSTOR",
-      error: "JSTOR could not be opened.",
+      error: "JSTOR could not complete the request.",
       stateConnected: "Connected",
       stateDisconnected: "Not connected",
       stateChecking: "Checking",
+      stateExpired: "Session expired",
+      stateError: "Error",
     },
     results: (count, failedSources, hasRealResults) => {
       const base = `${count} results`;
@@ -110,6 +126,13 @@ const UI_TEXT = {
       sort: "Sort",
       format: "Format",
       languages: "Languages",
+      disciplines: "Disciplines",
+      allDisciplines: "All",
+      selectedDisciplines: (count) => `${count} selected`,
+      date: "Date",
+      dateFrom: "From",
+      dateTo: "To",
+      clear: "Clear",
       allLanguages: "All",
       selectedLanguages: (count) => `${count} selected`,
       unknownLanguage: "Language not specified",
@@ -136,32 +159,23 @@ const UI_TEXT = {
   },
 };
 
-const SOURCE_LABELS = {
-  doi: "DOI",
-  annasarchive: "Anna's Archive",
-  archive: "Internet Archive",
-  bdebooks: "BDE Books",
-  bookracy: "Bookracy",
-  booksee: "Booksee",
-  ebookoz: "Ebookoz",
-  freebannedbooks: "FreeBannedBooks",
-  gutenberg: "Project Gutenberg",
-  inventaire: "Inventaire",
-  jstor: "JSTOR",
-  liber3: "Liber3",
-  libgen: "LibGen",
-  mobilism: "Mobilism Forum",
-  monoskop: "Monoskop",
-  myanonamouse: "MyAnonamouse",
-  openlibrary: "Open Library",
-  scribd: "Scribd",
-  standardebooks: "Standard Ebooks",
-  vkbookstagram: "VK Bookstagram",
-  wikisource: "Wikisource",
-  zlib: "Z-Library",
-};
+const SOURCE_LABELS = window.ScraaaperSources.LABELS;
+const SOURCE_GROUPS = window.ScraaaperSources.GROUPS;
+const NAV_SOURCE_KEYS = window.ScraaaperSources.SOURCE_KEYS;
 
-const NAV_SOURCE_KEYS = Object.keys(SOURCE_LABELS).filter((key) => key !== "doi");
+const DISCIPLINES = [
+  { key: "architecture", labels: { it: "Architettura", en: "Architecture" }, terms: ["architect", "urbanism", "built environment"] },
+  { key: "anthropology", labels: { it: "Antropologia", en: "Anthropology" }, terms: ["anthropolog", "ethnograph"] },
+  { key: "archaeology", labels: { it: "Archeologia", en: "Archaeology" }, terms: ["archaeolog"] },
+  { key: "art", labels: { it: "Arte", en: "Art" }, terms: ["art ", "visual culture", "museum"] },
+  { key: "design", labels: { it: "Design", en: "Design" }, terms: ["design"] },
+  { key: "philosophy", labels: { it: "Filosofia", en: "Philosophy" }, terms: ["philosoph"] },
+  { key: "geography", labels: { it: "Geografia", en: "Geography" }, terms: ["geograph", "landscape"] },
+  { key: "literature", labels: { it: "Letteratura", en: "Literature" }, terms: ["literat", "poetry", "fiction"] },
+  { key: "history", labels: { it: "Storia", en: "History" }, terms: ["history", "historical"] },
+  { key: "sociology", labels: { it: "Sociologia", en: "Sociology" }, terms: ["sociolog"] },
+  { key: "urban", labels: { it: "Studi urbani", en: "Urban studies" }, terms: ["urban", "city", "cities"] },
+];
 
 async function searchSource(sourceKey, query, signal) {
   const params = new URLSearchParams({ source: sourceKey, q: query, lang: currentLang });
@@ -211,6 +225,19 @@ const FETCHERS = Object.fromEntries(
   ])
 );
 
+FETCHERS.jstor = async (query, signal) => {
+  const bridge = window.scraaaperDesktop?.jstor;
+  if (!bridge || !jstorInstitutionalAccess) {
+    const error = new Error("JSTOR_AUTH_REQUIRED");
+    error.code = "JSTOR_AUTH_REQUIRED";
+    throw error;
+  }
+  if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+  const result = await bridge.searchResults(query);
+  if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+  return Array.isArray(result) ? result.slice(0, RESULTS_PER_SOURCE) : [];
+};
+
 const qInput = document.getElementById("q");
 const grid = document.getElementById("grid");
 const status = document.getElementById("status");
@@ -226,9 +253,10 @@ const jstorState = document.getElementById("jstorState");
 const jstorMessage = document.getElementById("jstorMessage");
 const jstorConnect = document.getElementById("jstorConnect");
 const jstorVerify = document.getElementById("jstorVerify");
+const jstorDisconnect = document.getElementById("jstorDisconnect");
 const jstorSearch = document.getElementById("jstorSearch");
 
-let activeSources = new Set(NAV_SOURCE_KEYS);
+let activeSources = new Set(window.ScraaaperSources.DEFAULT_ACTIVE);
 let currentController = null;
 let debounceTimer = null;
 let lastResults = [];
@@ -236,13 +264,89 @@ let lastFailedSources = [];
 let currentSort = "relevance";
 let currentFormat = "all";
 let selectedLanguages = new Set();
+let selectedDisciplines = new Set();
+let dateFrom = "";
+let dateTo = "";
 let lastExecutedQuery = "";
 let currentLang = localStorage.getItem("reading-lang") || "it";
 let searchInProgress = false;
 let jstorInstitutionalAccess = false;
 let jstorChecking = false;
+let jstorConnectionState = "disconnected";
+const sourceStatuses = new Map(NAV_SOURCE_KEYS.map((key) => [key, "idle"]));
+const collapsedGroups = new Set();
 const landing = document.getElementById("landing");
 const landingWord = document.getElementById("landingWord");
+
+function sourceStatusText(state) {
+  const labels = currentLang === "en"
+    ? {
+        idle: "Not checked",
+        searching: "Searching",
+        available: "Available",
+        slow: "Slow",
+        unavailable: "Unavailable",
+        "requires-access": "Requires access",
+      }
+    : {
+        idle: "Non verificata",
+        searching: "Ricerca",
+        available: "Disponibile",
+        slow: "Lenta",
+        unavailable: "Non disponibile",
+        "requires-access": "Richiede accesso",
+      };
+  return labels[state] || labels.idle;
+}
+
+function setSourceStatus(source, state) {
+  sourceStatuses.set(source, state);
+  const statusNode = sourcesNav.querySelector(`[data-source-status="${source}"]`);
+  if (!statusNode) return;
+  statusNode.dataset.state = state;
+  statusNode.textContent = sourceStatusText(state);
+}
+
+function renderSourceGroups() {
+  const collapseLabel = currentLang === "en" ? "Collapse all" : "Comprimi tutto";
+  sourcesNav.innerHTML = `
+    <div class="sources-toolbar">
+      <span>${currentLang === "en" ? "Search sources" : "Fonti di ricerca"}</span>
+      <button class="sources-collapse-all" data-collapse-all type="button">${collapseLabel}</button>
+    </div>
+    ${SOURCE_GROUPS.map((group) => {
+      const selected = group.sources.filter((source) => activeSources.has(source)).length;
+      const collapsed = collapsedGroups.has(group.id);
+      const allSelected = selected === group.sources.length;
+      return `
+        <section class="source-group ${collapsed ? "collapsed" : ""}" data-source-group="${group.id}">
+          <div class="source-group-header">
+            <button class="source-group-toggle" data-toggle-group="${group.id}" type="button" aria-expanded="${!collapsed}">
+              <span class="source-chevron" aria-hidden="true">⌄</span>
+              <strong>${escapeHtml(group.labels[currentLang])}</strong>
+              <span class="source-count">${selected}/${group.sources.length}</span>
+            </button>
+            <button class="source-group-select" data-select-group="${group.id}" type="button">
+              ${allSelected ? (currentLang === "en" ? "Clear" : "Azzera") : (currentLang === "en" ? "Select all" : "Seleziona tutte")}
+            </button>
+          </div>
+          <div class="source-group-body" ${collapsed ? "hidden" : ""}>
+            ${group.sources.map((source) => {
+              let state = sourceStatuses.get(source) || "idle";
+              if (source === "jstor" && !jstorInstitutionalAccess) state = "requires-access";
+              return `
+                <button class="chip ${activeSources.has(source) ? "active" : ""}" data-source="${source}" type="button" aria-pressed="${activeSources.has(source)}">
+                  <span>${escapeHtml(SOURCE_LABELS[source])}</span>
+                  <small class="source-state" data-source-status="${source}" data-state="${state}">${escapeHtml(sourceStatusText(state))}</small>
+                </button>
+              `;
+            }).join("")}
+          </div>
+        </section>
+      `;
+    }).join("")}
+  `;
+}
 
 function setTheme(isDark) {
   document.documentElement.classList.toggle("dark", isDark);
@@ -266,12 +370,7 @@ function applyLanguage(lang) {
     lang === "en" ? "Passa all’italiano" : "Switch to English"
   );
   footerText.textContent = UI_TEXT[lang].footer;
-  sourcesNav.querySelectorAll(".chip").forEach((chip) => {
-    const source = chip.dataset.source;
-    if (source === "all") {
-      chip.textContent = lang === "en" ? "All" : "Tutte";
-    }
-  });
+  renderSourceGroups();
   updateJstorPanel();
   if (qInput.value.trim()) {
     runSearch(qInput.value);
@@ -292,27 +391,34 @@ function updateJstorPanel(messageOverride = "") {
   jstorAccess.hidden = !shouldShow;
   if (!shouldShow) return;
   const text = UI_TEXT[currentLang].jstor;
-  const state = jstorChecking
-    ? "checking"
-    : jstorInstitutionalAccess ? "connected" : "disconnected";
+  const state = jstorChecking ? "checking" : jstorConnectionState;
   jstorTitle.textContent = text.title;
   jstorMessage.textContent = messageOverride || (
     jstorChecking ? text.checking
-      : jstorInstitutionalAccess ? text.connected : text.disconnected
+      : state === "expired" ? text.expired
+        : state === "error" ? text.error
+          : jstorInstitutionalAccess ? text.connected : text.disconnected
   );
   jstorState.dataset.state = state;
   jstorState.textContent = state === "checking"
     ? text.stateChecking
-    : state === "connected" ? text.stateConnected : text.stateDisconnected;
-  jstorConnect.textContent = jstorInstitutionalAccess ? text.manage : text.connect;
+    : state === "connected" ? text.stateConnected
+      : state === "expired" ? text.stateExpired
+        : state === "error" ? text.stateError : text.stateDisconnected;
+  jstorConnect.textContent = jstorInstitutionalAccess ? text.reconnect : text.connect;
   jstorVerify.textContent = text.verify;
+  jstorDisconnect.textContent = text.disconnect;
+  jstorDisconnect.hidden = !jstorInstitutionalAccess && state !== "expired";
   jstorSearch.textContent = text.search;
-  jstorSearch.disabled = !qInput.value.trim();
+  jstorSearch.disabled = !qInput.value.trim() || !jstorInstitutionalAccess;
+  setSourceStatus("jstor", jstorInstitutionalAccess ? "available" : "requires-access");
 }
 
 function applyJstorStatus(nextStatus) {
   jstorInstitutionalAccess = nextStatus?.institutionalAccess === true;
   jstorChecking = nextStatus?.checking === true;
+  jstorConnectionState = nextStatus?.state
+    || (jstorChecking ? "checking" : jstorInstitutionalAccess ? "connected" : "disconnected");
 }
 
 async function initializeJstorIntegration() {
@@ -327,6 +433,7 @@ async function initializeJstorIntegration() {
   } catch {
     jstorInstitutionalAccess = false;
     jstorChecking = false;
+    jstorConnectionState = "error";
   }
   bridge.onStatusChanged((nextStatus) => {
     applyJstorStatus(nextStatus);
@@ -341,36 +448,49 @@ setTheme(shouldDark);
 applyLanguage(currentLang);
 
 function startLanding() {
-  const isMobile = window.matchMedia("(max-width: 560px)").matches || window.innerWidth <= 560;
-  if (isMobile) {
-    document.body.classList.add("ready");
-    document.documentElement.classList.add("ready");
-    landing.classList.add("hidden");
-    return;
-  }
+  const letters = [..."scraaaper"];
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let position = 0;
+  landingWord.textContent = "";
+  landingWord.classList.add("typing");
 
-  const buildWord = (aCount) => `scr${"a".repeat(aCount)}ping`;
-  const baseWord = buildWord(1);
-  const targetWidth = Math.max(280, window.innerWidth - 40);
-  let aCount = 1;
-  landingWord.textContent = baseWord;
+  const finish = () => {
+    landingWord.classList.remove("typing");
+    landingWord.classList.add("caret-blink");
+    setTimeout(() => {
+      landingWord.classList.remove("caret-blink");
+      landingWord.classList.add("caret-visible");
+    }, reducedMotion ? 180 : 1_350);
+    setTimeout(() => {
+      landingWord.classList.remove("caret-visible");
+      landingWord.classList.add("caret-hidden");
+      document.body.classList.add("ready");
+      document.documentElement.classList.add("ready");
+      landing.classList.add("hidden");
+    }, reducedMotion ? 260 : 1_520);
+  };
 
-  const stepInterval = setInterval(() => {
-    aCount += 1;
-    const nextWord = buildWord(aCount);
-    landingWord.textContent = nextWord;
-
-    if (landingWord.getBoundingClientRect().width >= targetWidth || aCount >= 80) {
-      clearInterval(stepInterval);
+  const typeNext = () => {
+    if (position >= letters.length) {
+      finish();
+      return;
     }
-  }, 28);
+    const letter = letters[position];
+    landingWord.textContent += letter;
+    position += 1;
+    const delay = reducedMotion ? 18 : letter === "a" ? 310 : 120;
+    setTimeout(typeNext, delay);
+  };
 
   setTimeout(() => {
-    clearInterval(stepInterval);
-    document.body.classList.add("ready");
-    document.documentElement.classList.add("ready");
-    landing.classList.add("hidden");
-  }, 2900);
+    try {
+      typeNext();
+    } catch {
+      document.body.classList.add("ready");
+      document.documentElement.classList.add("ready");
+      landing.classList.add("hidden");
+    }
+  }, reducedMotion ? 20 : 160);
 }
 
 startLanding();
@@ -495,6 +615,21 @@ function isDisplayableResult(item) {
   return Boolean(item && item.link && item.source && item.title);
 }
 
+function itemDisciplines(item) {
+  const values = Array.isArray(item?.disciplines) ? item.disciplines : [];
+  return [...new Set(values.map((value) => String(value || "").trim().toLowerCase()).filter(Boolean))];
+}
+
+function matchesDateRange(item) {
+  if (!dateFrom && !dateTo) return true;
+  const match = String(item?.year || "").match(/(?:18|19|20)\d{2}/);
+  if (!match) return false;
+  const year = Number(match[0]);
+  if (dateFrom && year < Number(dateFrom)) return false;
+  if (dateTo && year > Number(dateTo)) return false;
+  return true;
+}
+
 function getVisibleResults() {
   const filteredBySource = lastResults.filter((r) => r.source === "doi" || activeSources.has(r.source));
   const displayable = filteredBySource.filter(isDisplayableResult);
@@ -505,9 +640,18 @@ function getVisibleResults() {
     ? withFormats
     : withFormats.filter((r) => inferFormat(r) === currentFormat);
   const filteredByLanguage = filteredByFormat.filter((r) => window.ScraaaperMetadata.matchesLanguages(r, selectedLanguages));
+  const filteredByDiscipline = selectedDisciplines.size === 0
+    ? filteredByLanguage
+    : filteredByLanguage.filter((item) => itemDisciplines(item).some((discipline) => selectedDisciplines.has(discipline)));
+  const filteredByDate = filteredByDiscipline.filter(matchesDateRange);
   // shortcut cards ("search on X") have no real file format, only show them in the "all" view
-  const visibleShortcuts = currentFormat === "all" && selectedLanguages.size === 0 ? shortcuts : [];
-  return sortResults([...filteredByLanguage, ...visibleShortcuts]);
+  const noMetadataFilters = currentFormat === "all"
+    && selectedLanguages.size === 0
+    && selectedDisciplines.size === 0
+    && !dateFrom
+    && !dateTo;
+  const visibleShortcuts = noMetadataFilters ? shortcuts : [];
+  return sortResults([...filteredByDate, ...visibleShortcuts]);
 }
 
 function getFilterableResults() {
@@ -524,6 +668,7 @@ function renderResultControls() {
   }
 
   const languageMenuWasOpen = resultControls.querySelector(".language-filter")?.open === true;
+  const disciplineMenuWasOpen = resultControls.querySelector(".discipline-filter")?.open === true;
   const filterableResults = getFilterableResults();
   const availableFormats = new Set(filterableResults.map(inferFormat).filter(Boolean));
   const availableLanguages = window.ScraaaperMetadata.availableLanguageCodes(filterableResults);
@@ -541,6 +686,20 @@ function renderResultControls() {
     currentLang,
     UI_TEXT[currentLang].controls.unknownLanguage
   );
+  const disciplineCounts = new Map();
+  filterableResults.forEach((item) => {
+    itemDisciplines(item).forEach((discipline) => {
+      disciplineCounts.set(discipline, (disciplineCounts.get(discipline) || 0) + 1);
+    });
+  });
+  if (!searchInProgress) {
+    selectedDisciplines = new Set(
+      [...selectedDisciplines].filter((discipline) => disciplineCounts.has(discipline))
+    );
+  }
+  const disciplineLabel = selectedDisciplines.size === 0
+    ? UI_TEXT[currentLang].controls.allDisciplines
+    : UI_TEXT[currentLang].controls.selectedDisciplines(selectedDisciplines.size);
   const selectedLabel = selectedLanguages.size === 0
     ? UI_TEXT[currentLang].controls.allLanguages
     : selectedLanguages.size === 1
@@ -610,6 +769,43 @@ function renderResultControls() {
         </div>
       </details>
     </div>
+    <div class="control-section control-section-separated">
+      <span class="control-label">${escapeHtml(UI_TEXT[currentLang].controls.disciplines)}</span>
+      <details class="language-filter discipline-filter" ${disciplineMenuWasOpen ? "open" : ""}>
+        <summary class="control-btn language-summary" ${activeSources.has("jstor") ? "" : "aria-disabled=\"true\""}>
+          <span>${escapeHtml(disciplineLabel)}</span><span class="language-chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div class="language-menu" role="group" aria-label="${escapeHtml(UI_TEXT[currentLang].controls.disciplines)}">
+          <button class="language-clear ${selectedDisciplines.size === 0 ? "active" : ""}" data-clear-disciplines type="button">
+            ${escapeHtml(UI_TEXT[currentLang].controls.allDisciplines)}
+          </button>
+          <div class="language-options">
+            ${DISCIPLINES.map((discipline) => {
+              const available = disciplineCounts.has(discipline.key);
+              return `
+                <label class="language-option ${available ? "" : "unavailable"}">
+                  <input type="checkbox" data-discipline="${discipline.key}" ${selectedDisciplines.has(discipline.key) ? "checked" : ""} ${available ? "" : "disabled"} />
+                  <span>${escapeHtml(discipline.labels[currentLang])}</span>
+                  <small>${available ? disciplineCounts.get(discipline.key) : "—"}</small>
+                </label>
+              `;
+            }).join("")}
+          </div>
+        </div>
+      </details>
+    </div>
+    <div class="control-section control-section-separated date-filter">
+      <span class="control-label">${escapeHtml(UI_TEXT[currentLang].controls.date)}</span>
+      <label>
+        <span>${escapeHtml(UI_TEXT[currentLang].controls.dateFrom)}</span>
+        <input data-date-from type="number" min="1000" max="2100" inputmode="numeric" value="${escapeHtml(dateFrom)}" />
+      </label>
+      <label>
+        <span>${escapeHtml(UI_TEXT[currentLang].controls.dateTo)}</span>
+        <input data-date-to type="number" min="1000" max="2100" inputmode="numeric" value="${escapeHtml(dateTo)}" />
+      </label>
+      <button class="control-btn" data-clear-date type="button" ${dateFrom || dateTo ? "" : "disabled"}>${escapeHtml(UI_TEXT[currentLang].controls.clear)}</button>
+    </div>
   `;
 }
 
@@ -646,6 +842,7 @@ async function runSearch(query) {
 
   if (normalizedQuery !== lastExecutedQuery) {
     selectedLanguages = new Set();
+    selectedDisciplines = new Set();
     currentFormat = "all";
     lastExecutedQuery = normalizedQuery;
   }
@@ -690,13 +887,25 @@ async function runSearch(query) {
 
   refresh();
   await Promise.all(sourceKeys.map(async (key) => {
+    let slowTimer = null;
     try {
+      if (key !== "doi") {
+        setSourceStatus(key, key === "jstor" && !jstorInstitutionalAccess ? "requires-access" : "searching");
+        slowTimer = setTimeout(() => setSourceStatus(key, "slow"), SOURCE_SLOW_MS);
+      }
       resultsBySource[key] = await FETCHERS[key](query, signal);
+      if (key !== "doi") setSourceStatus(key, "available");
     } catch (error) {
       if (signal.aborted) return;
-      failedSources.push(SOURCE_LABELS[key]);
+      if (error?.code === "JSTOR_AUTH_REQUIRED") {
+        setSourceStatus(key, "requires-access");
+      } else {
+        failedSources.push(SOURCE_LABELS[key]);
+        if (key !== "doi") setSourceStatus(key, "unavailable");
+      }
       if (error?.code === "BACKEND_UNAVAILABLE") backendUnavailable = true;
     } finally {
+      clearTimeout(slowTimer);
       if (!signal.aborted) {
         completed += 1;
         refresh();
@@ -743,6 +952,22 @@ jstorVerify.addEventListener("click", async () => {
   }
 });
 
+jstorDisconnect.addEventListener("click", async () => {
+  const bridge = window.scraaaperDesktop?.jstor;
+  if (!bridge) return;
+  jstorDisconnect.disabled = true;
+  try {
+    applyJstorStatus(await bridge.disconnect());
+    updateJstorPanel();
+    if (qInput.value.trim()) runSearch(qInput.value);
+  } catch {
+    jstorConnectionState = "error";
+    updateJstorPanel(UI_TEXT[currentLang].jstor.error);
+  } finally {
+    jstorDisconnect.disabled = false;
+  }
+});
+
 jstorSearch.addEventListener("click", async () => {
   const bridge = window.scraaaperDesktop?.jstor;
   if (!bridge || !qInput.value.trim()) return;
@@ -770,6 +995,22 @@ resultControls.addEventListener("click", (e) => {
     return;
   }
 
+  const clearDisciplines = e.target.closest("[data-clear-disciplines]");
+  if (clearDisciplines) {
+    selectedDisciplines = new Set();
+    renderResults();
+    resultControls.querySelector(".discipline-filter")?.setAttribute("open", "");
+    return;
+  }
+
+  const clearDate = e.target.closest("[data-clear-date]");
+  if (clearDate) {
+    dateFrom = "";
+    dateTo = "";
+    renderResults();
+    return;
+  }
+
   const sortBtn = e.target.closest("[data-sort]");
   if (sortBtn) {
     currentSort = sortBtn.dataset.sort;
@@ -786,44 +1027,83 @@ resultControls.addEventListener("click", (e) => {
 
 resultControls.addEventListener("change", (e) => {
   const languageInput = e.target.closest("[data-language]");
-  if (!languageInput || languageInput.disabled) return;
-  if (languageInput.checked) {
-    selectedLanguages.add(languageInput.dataset.language);
-  } else {
-    selectedLanguages.delete(languageInput.dataset.language);
+  if (languageInput && !languageInput.disabled) {
+    if (languageInput.checked) {
+      selectedLanguages.add(languageInput.dataset.language);
+    } else {
+      selectedLanguages.delete(languageInput.dataset.language);
+    }
+    renderResults();
+    resultControls.querySelector(".language-filter")?.setAttribute("open", "");
+    return;
+  }
+
+  const disciplineInput = e.target.closest("[data-discipline]");
+  if (disciplineInput && !disciplineInput.disabled) {
+    if (disciplineInput.checked) {
+      selectedDisciplines.add(disciplineInput.dataset.discipline);
+    } else {
+      selectedDisciplines.delete(disciplineInput.dataset.discipline);
+    }
+    renderResults();
+    resultControls.querySelector(".discipline-filter")?.setAttribute("open", "");
+    return;
+  }
+
+  const dateInput = e.target.closest("[data-date-from], [data-date-to]");
+  if (!dateInput) return;
+  const normalized = /^\d{4}$/.test(dateInput.value) ? dateInput.value : "";
+  if (dateInput.matches("[data-date-from]")) dateFrom = normalized;
+  if (dateInput.matches("[data-date-to]")) dateTo = normalized;
+  if (dateFrom && dateTo && Number(dateFrom) > Number(dateTo)) {
+    [dateFrom, dateTo] = [dateTo, dateFrom];
   }
   renderResults();
-  resultControls.querySelector(".language-filter")?.setAttribute("open", "");
 });
 
 sourcesNav.addEventListener("click", (e) => {
+  const collapseAll = e.target.closest("[data-collapse-all]");
+  if (collapseAll) {
+    const allCollapsed = SOURCE_GROUPS.every((group) => collapsedGroups.has(group.id));
+    collapsedGroups.clear();
+    if (!allCollapsed) SOURCE_GROUPS.forEach((group) => collapsedGroups.add(group.id));
+    renderSourceGroups();
+    return;
+  }
+
+  const toggleGroup = e.target.closest("[data-toggle-group]");
+  if (toggleGroup) {
+    const groupId = toggleGroup.dataset.toggleGroup;
+    if (collapsedGroups.has(groupId)) collapsedGroups.delete(groupId);
+    else collapsedGroups.add(groupId);
+    renderSourceGroups();
+    return;
+  }
+
+  const selectGroup = e.target.closest("[data-select-group]");
+  if (selectGroup) {
+    const group = SOURCE_GROUPS.find((candidate) => candidate.id === selectGroup.dataset.selectGroup);
+    if (!group) return;
+    const allSelected = group.sources.every((source) => activeSources.has(source));
+    group.sources.forEach((source) => {
+      if (allSelected) activeSources.delete(source);
+      else activeSources.add(source);
+    });
+    renderSourceGroups();
+    updateJstorPanel();
+    if (qInput.value.trim()) runSearch(qInput.value);
+    return;
+  }
+
   const btn = e.target.closest(".chip");
   if (!btn) return;
   const source = btn.dataset.source;
-  const allSourceKeys = NAV_SOURCE_KEYS;
-  const allSelected = allSourceKeys.every((key) => activeSources.has(key));
-
-  if (source === "all") {
-    activeSources = allSelected ? new Set() : new Set(allSourceKeys);
+  if (activeSources.has(source)) {
+    activeSources.delete(source);
   } else {
-    if (activeSources.has(source)) {
-      activeSources.delete(source);
-    } else {
-      activeSources.add(source);
-    }
-    if (activeSources.size === 0) {
-      activeSources = new Set(allSourceKeys);
-    }
+    activeSources.add(source);
   }
-
-  const allActive = allSourceKeys.every((key) => activeSources.has(key));
-  sourcesNav.querySelectorAll(".chip").forEach((chip) => {
-    if (chip.dataset.source === "all") {
-      chip.classList.toggle("active", allActive);
-    } else {
-      chip.classList.toggle("active", activeSources.has(chip.dataset.source));
-    }
-  });
+  renderSourceGroups();
 
   if (qInput.value.trim()) {
     runSearch(qInput.value);
