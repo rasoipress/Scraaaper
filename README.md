@@ -20,6 +20,7 @@ Le build macOS usano la firma locale gratuita ad hoc, ma non sono notarizzate da
 
 - clic destro sull'icona, **Apri**, e conferma.
 - Se macOS la blocca, vai in **Impostazioni di Sistema → Privacy e sicurezza** e conferma con **Apri comunque**.
+- In alternativa utilizza il terminale, inserisci il codice **xattr -cr [trascina app] → invio**.
 
 Una firma Developer ID e la notarizzazione, necessarie per eliminare stabilmente questi avvisi su tutti i Mac, richiedono un account Apple Developer a pagamento e non sono incluse.
 
