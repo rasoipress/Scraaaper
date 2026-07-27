@@ -9,14 +9,25 @@ const { GROUPS, DEFAULT_ACTIVE, SOURCE_KEYS } = require("../source-catalog");
 test("ogni fonte appartiene a un solo gruppo", () => {
   assert.equal(new Set(SOURCE_KEYS).size, SOURCE_KEYS.length);
   assert.deepEqual(GROUPS.map((group) => group.id), [
-    "open", "external", "academic", "documents", "drive",
+    "open", "external", "academic", "drive",
   ]);
+  assert.deepEqual(
+    GROUPS.find((group) => group.id === "academic").sources,
+    ["jstor", "core", "researchgate", "academia"],
+  );
+  assert.deepEqual(
+    GROUPS.find((group) => group.id === "drive").sources,
+    ["googledrive", "s3pdf"],
+  );
 });
 
 test("JSTOR, Drive e fonti esterne sono disattivati all'apertura", () => {
   const active = new Set(DEFAULT_ACTIVE);
   assert.equal(active.has("jstor"), false);
   assert.equal(active.has("googledrive"), false);
+  assert.equal(active.has("s3pdf"), false);
+  assert.equal(active.has("researchgate"), false);
+  assert.equal(active.has("academia"), false);
   const external = GROUPS.find((group) => group.id === "external").sources;
   assert.equal(external.some((source) => active.has(source)), false);
 });

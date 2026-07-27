@@ -14,9 +14,9 @@ Scraaaper non simula risultati e non aggira account, CAPTCHA, paywall o limitazi
 - Crossref e DataCite: risoluzione DOI.
 - JSTOR: ricerca in una sessione desktop istituzionale verificata; richiede accesso dell'utente ed è disattivata all'avvio.
 
-## Integrate tramite ricerca web trasparente
+## Integrate tramite risultati di un indice web
 
-Queste fonti non espongono tutte un'API pubblica stabile. Scraaaper costruisce una ricerca limitata al loro dominio e apre l'indice web, senza presentarla come risultato ottenuto direttamente dal sito:
+Queste fonti non espongono tutte un'API pubblica stabile. Scraaaper interroga un indice web limitato al loro dominio e mostra le singole pagine trovate, senza presentarle come dati ottenuti direttamente dal sito:
 
 - Unglue.it, Page by Page Books, ManyBooks, JustFreeBooks, Global Grey;
 - The Literature Network, DPLA, Faded Page, E-Book Mecca;
@@ -24,8 +24,9 @@ Queste fonti non espongono tutte un'API pubblica stabile. Scraaaper costruisce u
 - Ebookzy, By the Fireplace, DigiLibraries, Ex-Classics;
 - H. P. Lovecraft Archive, sherlock-holm.es, GrimmStories, AndersenStories;
 - Public Domain Review, Monoskop e CORE;
+- ResearchGate e Academia, limitatamente alle pagine pubbliche indicizzate e senza automatizzare login o download;
 - PDF pubblici su AWS S3;
-- Google Drive pubblico, con ricerche separate PDF ed EPUB e frase esatta.
+- Google Drive pubblico, con frase esatta e formati PDF ed EPUB.
 
 La disponibilità può variare in base all'indice web, al paese e alle condizioni del sito.
 
@@ -42,4 +43,3 @@ Le fonti esterne già presenti restano opzionali e isolate dagli altri provider:
 - provider senza ricerca funzionante o che richiedono CAPTCHA/protezioni incompatibili;
 - OceanOfPDF, PDF Room, Ebook PDF, KuPDF, ePDF, PDFCoffee, PDFCookie e iDoc: non integrati come motori automatici perché non offrono un'API pubblica affidabile e possono indicizzare materiale non autorizzato;
 - nuovi domini alternativi di Anna's Archive, Z-Library e LibGen: non aggiunti.
-

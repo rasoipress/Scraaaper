@@ -56,6 +56,25 @@ function clean(value, limit = 300) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, limit);
 }
 
+function parseJstorResultText(title, value) {
+  const normalizedTitle = clean(title, 240);
+  const ignoredTypes = /^(?:journal article|book chapter|book|research report|review|miscellaneous)$/i;
+  const lines = String(value || "")
+    .split(/\r?\n/)
+    .map((line) => clean(line, 500))
+    .filter((line) => line && !ignoredTypes.test(line) && line !== normalizedTitle);
+  const publicationIndex = lines.findIndex((line) => (
+    /\b(?:Vol|No|pp?|Issue|Journal)\.?(?:\s|$)/i.test(line)
+    || /\((?:18|19|20)\d{2}\)/.test(line)
+  ));
+  const authorLines = (publicationIndex > 0 ? lines.slice(0, publicationIndex) : lines.slice(0, 1))
+    .filter((line) => !/^https?:/i.test(line) && !/\b(?:download|view|preview|access)\b/i.test(line));
+  return {
+    author: clean(authorLines.join(", "), 180),
+    publication: publicationIndex >= 0 ? clean(lines[publicationIndex], 240) : "",
+  };
+}
+
 function normalizeJstorSearchRecords(records) {
   const results = [];
   const seen = new Set();
@@ -73,12 +92,14 @@ function normalizeJstorSearchRecords(records) {
     }
     if (!title || seen.has(link)) continue;
     seen.add(link);
+    const parsedText = parseJstorResultText(title, record?.context);
     const context = clean(record?.context, 2000);
     const year = context.match(/(?:^|\D)((?:18|19|20)\d{2})(?:\D|$)/)?.[1] || "";
     const doi = context.match(/\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i)?.[0]?.replace(/[.,;:]$/, "") || "";
     const author = (
       context.match(/\b(?:Author|Authors|By)\s*:?\s*([^\n|·]{2,180})/i)?.[1]
       || clean(record?.author, 180)
+      || parsedText.author
     );
     const haystack = `${title} ${context}`.toLowerCase();
     const disciplines = Object.entries(DISCIPLINE_TERMS)
@@ -95,7 +116,7 @@ function normalizeJstorSearchRecords(records) {
       languages: [],
       doi: doi || null,
       disciplines,
-      publication: clean(record?.publication, 180),
+      publication: clean(record?.publication, 180) || parsedText.publication,
       searchMode: "authenticated",
     });
     if (results.length >= 24) break;
@@ -111,4 +132,5 @@ module.exports = {
   isJstorUrl,
   jstorSearchUrl,
   normalizeJstorSearchRecords,
+  parseJstorResultText,
 };

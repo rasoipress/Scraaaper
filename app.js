@@ -279,32 +279,22 @@ const landing = document.getElementById("landing");
 const landingWord = document.getElementById("landingWord");
 
 function sourceStatusText(state) {
-  const labels = currentLang === "en"
-    ? {
-        idle: "Not checked",
-        searching: "Searching",
-        available: "Available",
-        slow: "Slow",
-        unavailable: "Unavailable",
-        "requires-access": "Requires access",
-      }
-    : {
-        idle: "Non verificata",
-        searching: "Ricerca",
-        available: "Disponibile",
-        slow: "Lenta",
-        unavailable: "Non disponibile",
-        "requires-access": "Richiede accesso",
-      };
-  return labels[state] || labels.idle;
+  if (state !== "requires-access") return "";
+  return currentLang === "en" ? "Requires access" : "Richiede accesso";
 }
 
 function setSourceStatus(source, state) {
   sourceStatuses.set(source, state);
+  const sourceNode = sourcesNav.querySelector(`[data-source="${source}"]`);
   const statusNode = sourcesNav.querySelector(`[data-source-status="${source}"]`);
+  if (sourceNode) {
+    sourceNode.dataset.sourceState = state;
+    sourceNode.setAttribute("aria-label", `${SOURCE_LABELS[source]}${sourceStatusText(state) ? ` — ${sourceStatusText(state)}` : ""}`);
+  }
   if (!statusNode) return;
   statusNode.dataset.state = state;
   statusNode.textContent = sourceStatusText(state);
+  statusNode.hidden = state !== "requires-access";
 }
 
 function renderSourceGroups() {
@@ -335,9 +325,9 @@ function renderSourceGroups() {
               let state = sourceStatuses.get(source) || "idle";
               if (source === "jstor" && !jstorInstitutionalAccess) state = "requires-access";
               return `
-                <button class="chip ${activeSources.has(source) ? "active" : ""}" data-source="${source}" type="button" aria-pressed="${activeSources.has(source)}">
+                <button class="chip ${activeSources.has(source) ? "active" : ""}" data-source="${source}" data-source-state="${state}" type="button" aria-pressed="${activeSources.has(source)}" aria-label="${escapeHtml(`${SOURCE_LABELS[source]}${sourceStatusText(state) ? ` — ${sourceStatusText(state)}` : ""}`)}">
                   <span>${escapeHtml(SOURCE_LABELS[source])}</span>
-                  <small class="source-state" data-source-status="${source}" data-state="${state}">${escapeHtml(sourceStatusText(state))}</small>
+                  <small class="source-state" data-source-status="${source}" data-state="${state}" ${state === "requires-access" ? "" : "hidden"}>${escapeHtml(sourceStatusText(state))}</small>
                 </button>
               `;
             }).join("")}
@@ -632,9 +622,7 @@ function matchesDateRange(item) {
 
 function getVisibleResults() {
   const filteredBySource = lastResults.filter((r) => r.source === "doi" || activeSources.has(r.source));
-  const displayable = filteredBySource.filter(isDisplayableResult);
-  const genuine = displayable.filter(isGenuineResult);
-  const shortcuts = displayable.filter((r) => !isGenuineResult(r));
+  const genuine = filteredBySource.filter(isGenuineResult);
   const withFormats = applyFormatMetadata(genuine);
   const filteredByFormat = currentFormat === "all"
     ? withFormats
@@ -644,14 +632,7 @@ function getVisibleResults() {
     ? filteredByLanguage
     : filteredByLanguage.filter((item) => itemDisciplines(item).some((discipline) => selectedDisciplines.has(discipline)));
   const filteredByDate = filteredByDiscipline.filter(matchesDateRange);
-  // shortcut cards ("search on X") have no real file format, only show them in the "all" view
-  const noMetadataFilters = currentFormat === "all"
-    && selectedLanguages.size === 0
-    && selectedDisciplines.size === 0
-    && !dateFrom
-    && !dateTo;
-  const visibleShortcuts = noMetadataFilters ? shortcuts : [];
-  return sortResults([...filteredByDate, ...visibleShortcuts]);
+  return sortResults(filteredByDate);
 }
 
 function getFilterableResults() {
@@ -1086,8 +1067,12 @@ sourcesNav.addEventListener("click", (e) => {
     if (!group) return;
     const allSelected = group.sources.every((source) => activeSources.has(source));
     group.sources.forEach((source) => {
-      if (allSelected) activeSources.delete(source);
-      else activeSources.add(source);
+      if (allSelected) {
+        activeSources.delete(source);
+        sourceStatuses.set(source, source === "jstor" && !jstorInstitutionalAccess ? "requires-access" : "idle");
+      } else {
+        activeSources.add(source);
+      }
     });
     renderSourceGroups();
     updateJstorPanel();
@@ -1100,6 +1085,7 @@ sourcesNav.addEventListener("click", (e) => {
   const source = btn.dataset.source;
   if (activeSources.has(source)) {
     activeSources.delete(source);
+    sourceStatuses.set(source, source === "jstor" && !jstorInstitutionalAccess ? "requires-access" : "idle");
   } else {
     activeSources.add(source);
   }

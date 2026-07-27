@@ -8,6 +8,7 @@ const {
   isJstorUrl,
   jstorSearchUrl,
   normalizeJstorSearchRecords,
+  parseJstorResultText,
 } = require("../desktop/jstor");
 
 test("accetta soltanto collegamenti HTTPS appartenenti a JSTOR", () => {
@@ -73,4 +74,25 @@ test("normalizza risultati JSTOR autenticati e riconosce le discipline", () => {
   assert.equal(results[0].year, "2003");
   assert.equal(results[0].doi, "10.2307/41765001");
   assert.deepEqual(results[0].disciplines.sort(), ["architecture", "urban"]);
+});
+
+test("legge i risultati correnti di JSTOR anche dai componenti Web", () => {
+  const metadata = [
+    "JOURNAL ARTICLE",
+    "Architecture And the Death of Carbon Modernity",
+    "Elisa Iturbe",
+    "Log, No. 47, Overcoming Carbon Form (Fall 2019), pp. 10-23",
+  ].join("\n");
+  assert.deepEqual(parseJstorResultText("Architecture And the Death of Carbon Modernity", metadata), {
+    author: "Elisa Iturbe",
+    publication: "Log, No. 47, Overcoming Carbon Form (Fall 2019), pp. 10-23",
+  });
+  const [result] = normalizeJstorSearchRecords([{
+    title: "Architecture And the Death of Carbon Modernity",
+    link: "https://www.jstor.org/stable/26835026?seq=1",
+    context: metadata,
+  }]);
+  assert.equal(result.author, "Elisa Iturbe");
+  assert.match(result.publication, /^Log, No\. 47/);
+  assert.equal(result.year, "2019");
 });

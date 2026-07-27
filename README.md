@@ -33,7 +33,9 @@ Puoi controllare anche manualmente da **Aiuto → Controlla aggiornamenti…**
 
 Le fonti vengono interrogate in parallelo e i risultati compaiono man mano che ciascuna risponde. Durante la ricerca un indicatore discreto mostra quante fonti hanno finito e quanti risultati sono già disponibili. Le fonti più lente continuano a lavorare in sottofondo senza nascondere quello che hai già trovato.
 
-Le fonti sono divise in sezioni richiudibili: **Accesso aperto**, **Fonti esterne**, **Fonti accademiche**, **PDF e documenti** e **Drive pubblici**. Ogni sezione può essere selezionata o azzerata in un solo gesto. Le fonti aperte affidabili sono attive al primo avvio; JSTOR, fonti esterne e Drive pubblici sono disattivati.
+Le fonti sono divise in sezioni richiudibili: **Accesso aperto**, **Fonti esterne**, **Fonti accademiche** e **Drive pubblici**. Ogni sezione può essere selezionata o azzerata in un solo gesto. Le fonti aperte affidabili sono attive al primo avvio; JSTOR, fonti esterne e Drive pubblici sono disattivati.
+
+Lo stato è visivo: una fonte che ha risposto è piena, una fonte non raggiungibile ha il contorno più spesso e una fonte lenta ha un contorno tratteggiato. Le scritte restano solo dove è richiesto un accesso.
 
 ## Metadati, filtri e DOI
 
@@ -57,11 +59,11 @@ L'accesso non è obbligatorio: il riquadro resta visibile ma non blocca le ricer
 
 ## Fonti e accesso
 
-Le fonti con API o cataloghi leggibili vengono interrogate direttamente. Per alcune fonti pubbliche senza un'API stabile Scraaaper prepara invece una ricerca web trasparente limitata al dominio originale. Il risultato rimanda sempre alla pagina di origine.
+Le fonti con API o cataloghi leggibili vengono interrogate direttamente. Per alcune fonti pubbliche senza un'API stabile Scraaaper usa un indice web limitato al dominio originale e mostra le singole pagine trovate. Ogni risultato rimanda alla pagina di origine; non vengono più mostrate schede che aprono soltanto una nuova ricerca.
 
 Scraaaper non aggira login, CAPTCHA o condizioni di accesso dei singoli siti: gli accessi previsti li fai tu, come faresti normalmente. Se una fonte è temporaneamente irraggiungibile l'app te lo dice, senza riempire il vuoto con risultati fittizi.
 
-La voce **Drive pubblici**, quando attivata, prepara due ricerche separate per la frase esatta: `site:drive.google.com "ricerca" filetype:pdf` e `site:drive.google.com "ricerca" filetype:epub`. Non accede a file privati e non elude autorizzazioni.
+La voce **Drive pubblici**, quando attivata, cerca nell'indice pubblico pagine equivalenti a `site:drive.google.com "ricerca" (filetype:pdf OR filetype:epub)` e mostra i singoli file trovati. La stessa sezione include i PDF pubblicamente indicizzati su AWS S3. Non accede a file privati e non elude autorizzazioni.
 
 Il resoconto completo delle integrazioni e delle esclusioni è in [SOURCES.md](SOURCES.md).
 

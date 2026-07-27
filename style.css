@@ -489,10 +489,32 @@ body.dark .header-actions button {
   border-color: var(--chip-hover-border);
 }
 
-.chip.active {
+.chip.active,
+.chip[data-source-state="available"] {
   color: var(--chip-active-text);
   border-color: var(--chip-active-bg);
   background: var(--chip-active-bg);
+}
+
+.chip[data-source-state="unavailable"] {
+  border-width: 2px;
+  padding: 5px 13px;
+}
+
+.chip[data-source-state="slow"] {
+  border-width: 2px;
+  border-style: dashed;
+  padding: 5px 13px;
+}
+
+.chip[data-source-state="searching"]::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border: 1px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
 }
 
 .source-state {
@@ -504,24 +526,31 @@ body.dark .header-actions button {
   text-transform: uppercase;
 }
 
-.chip.active .source-state {
+.chip.active .source-state,
+.chip[data-source-state="available"] .source-state {
   color: currentColor;
   opacity: 0.72;
 }
 
-.source-state[data-state="available"]::before,
-.source-state[data-state="slow"]::before,
-.source-state[data-state="unavailable"]::before,
-.source-state[data-state="requires-access"]::before,
-.source-state[data-state="searching"]::before {
+.source-state[data-state="requires-access"]::before {
   content: "•";
   margin-right: 3px;
 }
 
 :root.dark .chip.active,
-body.dark .chip.active {
+body.dark .chip.active,
+:root.dark .chip[data-source-state="available"],
+body.dark .chip[data-source-state="available"] {
   color: #111;
   background: #f5f5f0;
+}
+
+.chip.active[data-source-state="unavailable"],
+:root.dark .chip.active[data-source-state="unavailable"],
+body.dark .chip.active[data-source-state="unavailable"] {
+  color: var(--gray);
+  background: transparent;
+  border-color: var(--black);
 }
 
 .status-row {

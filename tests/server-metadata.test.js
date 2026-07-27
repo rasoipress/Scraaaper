@@ -12,10 +12,13 @@ test("il motore Python normalizza DOI e crea il risultato Crossref", () => {
     "assert server.normalize_doi('https://doi.org/10.1000/182') == '10.1000/182'",
     "assert server.normalize_languages(['eng', 'Italian']) == ['en', 'it']",
     "record = server.crossref_item_from_message({'title': ['Titolo'], 'author': [{'given': 'Nome', 'family': 'Cognome'}], 'issued': {'date-parts': [[2024]]}, 'language': 'it', 'DOI': '10.1000/182'}, '10.1000/182')",
-    "drive = server.search_google_drive('perturbante vidler', 'it')",
-    "assert 'site%3Adrive.google.com' in drive[0]['link']",
-    "assert '%22perturbante+vidler%22' in drive[0]['link']",
-    "assert {item['fileType'] for item in drive} == {'pdf', 'epub'}",
+    "drive = server.build_index_query('googledrive', 'perturbante vidler')",
+    "assert 'site:drive.google.com/file' in drive",
+    "assert 'site:docs.google.com/document' in drive",
+    "assert '\"perturbante vidler\"' in drive",
+    "assert 'filetype:pdf OR filetype:epub' in drive",
+    "s3 = server.build_index_query('s3pdf', 'urban studies')",
+    "assert s3 == 'site:s3.amazonaws.com \"urban studies\" filetype:pdf'",
     "print(json.dumps(record))",
   ].join("; ");
   const result = spawnSync(process.env.PYTHON_BIN || "python3", ["-c", script], {

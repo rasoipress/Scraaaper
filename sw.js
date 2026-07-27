@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reading-cache-v8';
+const CACHE_NAME = 'reading-cache-v9';
 const APP_SHELL = ['./', './index.html', './style.css', './source-catalog.js', './result-metadata.js', './search-results.js', './app.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (event) => {

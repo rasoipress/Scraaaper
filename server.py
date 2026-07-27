@@ -35,7 +35,7 @@ RESULT_LIMIT = 24
 MAX_RESPONSE_BYTES = 8_000_000
 REQUEST_TIMEOUT = 22
 CACHE_TTL_SECONDS = 300
-INDEX_REQUEST_GAP_SECONDS = 0.35
+INDEX_REQUEST_GAP_SECONDS = 1.0
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -99,6 +99,8 @@ SOURCE_LABELS = {
     "andersen": "AndersenStories",
     "publicdomainreview": "Public Domain Review",
     "core": "CORE",
+    "researchgate": "ResearchGate",
+    "academia": "Academia",
     "s3pdf": "AWS S3 PDF",
     "googledrive": "Google Drive",
 }
@@ -128,7 +130,7 @@ LANGUAGE_ALIASES = {
 # or actively block automated catalogue requests.  For them we return real
 # pages from a public web index restricted to the source's own domain.
 INDEX_SCOPES = {
-    "annasarchive": ["annas-archive.gl/md5"],
+    "annasarchive": ["annas-archive.gl/md5", "annas-archive.pk", "annas-archive.gd"],
     "bdebooks": ["bdebooks.com/en/books"],
     "booksee": ["en.booksee.org/book"],
     "ebookoz": ["ebookoz.net"],
@@ -137,36 +139,34 @@ INDEX_SCOPES = {
     "libgen": ["libgen.gl"],
     "mobilism": ["forum.mobilism.org"],
     "scribd": ["scribd.com/document"],
-    "zlib": ["z-lib.gd", "z-library.sk"],
+    "zlib": ["z-lib.gd", "z-library.sk","z-library.gs", "1lib.sk", "z-lib.fm", "z-lib.gd", "z-lib.gl", "zliba.ru", "z-lib.sk"],
     "core": ["core.ac.uk/works"],
-}
-
-# Sources without a stable public API are exposed as transparent, pre-filled
-# searches. They never masquerade as catalogue records and always open the
-# original site (or a search-engine site query) in the user's browser.
-SITE_SEARCH_SCOPES = {
-    "unglue": "unglue.it",
-    "pagebypage": "pagebypagebooks.com",
-    "manybooks": "manybooks.net",
-    "justfreebooks": "justfreebooks.info",
-    "globalgrey": "globalgreyebooks.com",
-    "literature": "online-literature.com",
-    "dpla": "dp.la",
-    "fadedpage": "fadedpage.com",
-    "ebookmecca": "ebook-mecca.com",
-    "planetebook": "planetebook.com",
-    "loyalbooks": "loyalbooks.com",
-    "planetpublish": "planetpublish.com",
-    "baen": "baen.com",
-    "ebookzy": "ebookzy.com",
-    "bythefireplace": "bythefireplace.com",
-    "digilibraries": "digilibraries.com",
-    "exclassics": "exclassics.com",
-    "hplovecraft": "hplovecraft.com",
-    "sherlock": "sherlock-holm.es",
-    "grimm": "grimmstories.com",
-    "andersen": "andersenstories.com",
-    "publicdomainreview": "publicdomainreview.org",
+    "researchgate": ["researchgate.net/publication"],
+    "academia": ["academia.edu"],
+    "googledrive": ["drive.google.com/file", "drive.google.com/open", "docs.google.com/document"],
+    "s3pdf": ["s3.amazonaws.com"],
+    "unglue": ["unglue.it"],
+    "pagebypage": ["pagebypagebooks.com"],
+    "manybooks": ["manybooks.net"],
+    "justfreebooks": ["justfreebooks.info"],
+    "globalgrey": ["globalgreyebooks.com"],
+    "literature": ["online-literature.com"],
+    "dpla": ["dp.la"],
+    "fadedpage": ["fadedpage.com"],
+    "ebookmecca": ["ebook-mecca.com"],
+    "planetebook": ["planetebook.com"],
+    "loyalbooks": ["loyalbooks.com"],
+    "planetpublish": ["planetpublish.com"],
+    "baen": ["baen.com"],
+    "ebookzy": ["ebookzy.com"],
+    "bythefireplace": ["bythefireplace.com"],
+    "digilibraries": ["digilibraries.com"],
+    "exclassics": ["exclassics.com"],
+    "hplovecraft": ["hplovecraft.com"],
+    "sherlock": ["sherlock-holm.es"],
+    "grimm": ["grimmstories.com"],
+    "andersen": ["andersenstories.com"],
+    "publicdomainreview": ["publicdomainreview.org"],
 }
 
 
@@ -892,32 +892,43 @@ def decode_yahoo_link(href: str) -> str:
     return full
 
 
+def build_index_query(source: str, query: str) -> str:
+    scopes = INDEX_SCOPES[source]
+    site_expression = " OR ".join(f"site:{scope}" for scope in scopes)
+    sites = f"({site_expression})" if len(scopes) > 1 else site_expression
+    exact = f'"{query.strip()}"'
+    if source == "googledrive":
+        return f"{sites} {exact} (filetype:pdf OR filetype:epub)"
+    if source == "s3pdf":
+        return f"{sites} {exact} filetype:pdf"
+    return f"{sites} {query}"
+
+
 def indexed_search(source: str, query: str) -> list[dict[str, Any]]:
     global _last_index_request
 
     scopes = INDEX_SCOPES[source]
-    site_expression = " OR ".join(f"site:{scope}" for scope in scopes)
-    search_query = f"({site_expression}) {query}" if len(scopes) > 1 else f"{site_expression} {query}"
-    url = f"https://search.yahoo.com/search?{urlencode({'p': search_query})}"
+    search_query = build_index_query(source, query)
+    brave_url = f"https://search.brave.com/search?{urlencode({'q': search_query, 'source': 'web'})}"
+    yahoo_url = f"https://search.yahoo.com/search?{urlencode({'p': search_query})}"
     with _index_request_lock:
         delay = INDEX_REQUEST_GAP_SECONDS - (time.monotonic() - _last_index_request)
         if delay > 0:
             time.sleep(delay)
         _last_index_request = time.monotonic()
     try:
-        page = fetch_text(url, headers={"Accept": "text/html"})
-    except SearchError as exc:
-        if not re.search(r"HTTP (?:429|500|503)\b", str(exc)):
-            raise
-        time.sleep(INDEX_REQUEST_GAP_SECONDS)
-        page = fetch_text(url, headers={"Accept": "text/html"})
+        page = fetch_text(brave_url, headers={"Accept": "text/html"})
+        index_name = "brave"
+    except SearchError:
+        page = fetch_text(yahoo_url, headers={"Accept": "text/html"})
+        index_name = "yahoo"
     anchors = parse_anchors(page)
     results: list[dict[str, Any]] = []
     allowed_hosts = [scope.split("/", 1)[0].casefold() for scope in scopes]
     for anchor in anchors:
-        if anchor.attrs.get("data-matarget") != "algo":
+        if index_name == "yahoo" and anchor.attrs.get("data-matarget") != "algo":
             continue
-        link = decode_yahoo_link(anchor.href)
+        link = decode_yahoo_link(anchor.href) if index_name == "yahoo" else urljoin(brave_url, anchor.href)
         hostname = (urlparse(link).hostname or "").casefold()
         if not any(hostname == host or hostname.endswith(f".{host}") for host in allowed_hosts):
             continue
@@ -926,63 +937,15 @@ def indexed_search(source: str, query: str) -> list[dict[str, Any]]:
             "",
             clean_text(anchor.text, 400),
         )
-        results.append(item(source, title, link, search_mode="indexed"))
-    terms = [term.casefold() for term in re.findall(r"[\w']+", query) if len(term) > 2]
-    relevant = [
-        result
-        for result in results
-        if not terms
-        or all(term in f"{result.get('title', '')} {result.get('author', '')}".casefold() for term in terms)
-    ]
-    return dedupe(relevant)
-
-def site_search_shortcut(source: str, query: str, lang: str) -> list[dict[str, Any]]:
-    domain = SITE_SEARCH_SCOPES[source]
-    expression = f'site:{domain} "{query}"'
-    url = f"https://www.google.com/search?{urlencode({'q': expression})}"
-    prefix = "Search on" if lang == "en" else "Cerca su"
-    return [
-        item(
-            source,
-            f'{prefix} {SOURCE_LABELS[source]}: “{query}”',
-            url,
-            author=f"{prefix} {SOURCE_LABELS[source]}",
-            search_mode="shortcut",
-        )
-    ]
-
-
-def search_google_drive(query: str, lang: str) -> list[dict[str, Any]]:
-    prefix = "Search on" if lang == "en" else "Cerca su"
-    results = []
-    for file_type in ("pdf", "epub"):
-        expression = f'site:drive.google.com "{query}" filetype:{file_type}'
-        results.append(
-            item(
-                "googledrive",
-                f'{prefix} Google Drive: “{query}” ({file_type.upper()})',
-                f"https://www.google.com/search?{urlencode({'q': expression})}",
-                author=f"{prefix} Google Drive",
-                file_type=file_type,
-                search_mode="shortcut",
-            )
-        )
-    return results
-
-
-def search_s3_pdf(query: str, lang: str) -> list[dict[str, Any]]:
-    prefix = "Search on" if lang == "en" else "Cerca su"
-    expression = f'site:s3.amazonaws.com "{query}" filetype:pdf'
-    return [
-        item(
-            "s3pdf",
-            f'{prefix} AWS S3: “{query}” (PDF)',
-            f"https://www.google.com/search?{urlencode({'q': expression})}",
-            author=f"{prefix} AWS S3",
-            file_type="pdf",
-            search_mode="shortcut",
-        )
-    ]
+        title = re.sub(r"^🌐.*?›\s*view(?:\s+|$)", "", title, flags=re.I)
+        title = re.sub(r"^🌐\s+.*?\s+WEB\s*-\s*", "", title, flags=re.I)
+        if not title:
+            continue
+        file_type = detect_file_type(f"{title} {link}")
+        if source == "s3pdf":
+            file_type = "pdf"
+        results.append(item(source, title, link, file_type=file_type, search_mode="indexed"))
+    return dedupe(results)
 
 
 NativeSearch = Callable[[str, str], list[dict[str, Any]]]
@@ -1004,8 +967,6 @@ NATIVE_SEARCHERS: dict[str, NativeSearch] = {
     "standardebooks": search_standardebooks,
     "wikisource": lambda query, lang: search_mediawiki("wikisource", query, lang),
     "wikibooks": lambda query, lang: search_mediawiki("wikibooks", query, lang),
-    "googledrive": search_google_drive,
-    "s3pdf": search_s3_pdf,
 }
 
 
@@ -1038,11 +999,7 @@ def search_source(source: str, query: str, lang: str) -> dict[str, Any]:
         except Exception as exc:
             index_error = exc
 
-    if not results and source in SITE_SEARCH_SCOPES:
-        results = site_search_shortcut(source, query, lang)
-        mode = "shortcut"
-
-    if not results and searcher is None and source not in INDEX_SCOPES and source not in SITE_SEARCH_SCOPES:
+    if not results and searcher is None and source not in INDEX_SCOPES:
         raise SearchError(f"sorgente non configurata: {source}")
     if native_error and index_error:
         raise SearchError(f"ricerca nativa: {native_error}; indice web: {index_error}")

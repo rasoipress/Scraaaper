@@ -279,12 +279,15 @@ async function searchJstorInAuthenticatedSession(query) {
       if (searchWindow.isDestroyed()) break;
       const snapshot = await searchWindow.webContents.executeJavaScript(`(() => {
         const pageText = document.documentElement?.innerText || "";
-        const anchors = [...document.querySelectorAll('a[href*="/stable/"]')];
+        const anchors = [...document.querySelectorAll(
+          '[data-qa="search-result-title-link"][href*="/stable/"], a[href*="/stable/"]'
+        )];
         const records = anchors.map((anchor) => {
           const container = anchor.closest(
-            '[data-testid*="search-result"], [class*="search-result"], [class*="result-item"], article, li'
+            '[data-qa="search-result-type-default"], [data-testid*="search-result"], [class*="search-result"], [class*="result-item"], article, li'
           ) || anchor.parentElement;
-          const titleNode = anchor.querySelector('h1, h2, h3, h4')
+          const metadata = container?.querySelector('.result__main__metadata') || container;
+          const titleNode = anchor.querySelector('[data-qa="search-result-title-heading"], h1, h2, h3, h4')
             || container?.querySelector('h1 a[href*="/stable/"], h2 a[href*="/stable/"], h3 a[href*="/stable/"]')
             || anchor;
           const authorNode = container?.querySelector(
@@ -295,10 +298,10 @@ async function searchJstorInAuthenticatedSession(query) {
           );
           return {
             title: titleNode?.textContent || "",
-            link: anchor.href,
+            link: new URL(anchor.getAttribute('href') || anchor.href, location.href).href,
             author: authorNode?.textContent || "",
             publication: publicationNode?.textContent || "",
-            context: container?.innerText || "",
+            context: metadata?.innerText || container?.innerText || "",
           };
         });
         return { pageText: pageText.slice(0, 20000), records };

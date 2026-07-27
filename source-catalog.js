@@ -30,17 +30,12 @@
     {
       id: "academic",
       labels: { it: "Fonti accademiche", en: "Academic sources" },
-      sources: ["jstor", "core"],
-    },
-    {
-      id: "documents",
-      labels: { it: "PDF e documenti", en: "PDF and documents" },
-      sources: ["s3pdf"],
+      sources: ["jstor", "core", "researchgate", "academia"],
     },
     {
       id: "drive",
       labels: { it: "Drive pubblici", en: "Public drives" },
-      sources: ["googledrive"],
+      sources: ["googledrive", "s3pdf"],
     },
   ];
 
@@ -89,6 +84,8 @@
     andersen: "AndersenStories",
     publicdomainreview: "Public Domain Review",
     core: "CORE",
+    researchgate: "ResearchGate",
+    academia: "Academia",
     s3pdf: "AWS S3 PDF",
     googledrive: "Google Drive",
   };
