@@ -136,7 +136,7 @@ INDEX_SCOPES = {
     "ebookoz": ["ebookoz.net"],
     "jstor": ["jstor.org/stable"],
     "liber3": ["liber3.eth.limo"],
-    "libgen": ["libgen.gl"],
+    "libgen": ["libgen.gl", "libgen.li", "libgen.gl", "libgen.bz", "libgen.vg"],
     "mobilism": ["forum.mobilism.org"],
     "scribd": ["scribd.com/document"],
     "zlib": ["z-lib.gd", "z-library.sk","z-library.gs", "1lib.sk", "z-lib.fm", "z-lib.gd", "z-lib.gl", "zliba.ru", "z-lib.sk"],
