@@ -2,6 +2,10 @@
 
 Scraaaper è un'app desktop gratuita per macOS e Windows che cerca libri, articoli e documenti nelle fonti scelte dall'utente. Il motore di ricerca è incluso nell'app: niente Python, Terminale, server a pagamento o abbonamenti.
 
+## Attenzione, VPN
+
+Da agosto 2026 in Italia sono stati bloccati numerosi siti di librerie online gratuite, per poter utilizzare Scraaaper è quindi necessario avere un VPN attivo e funzionante, altrimenti la ricerca su librerie non riconosciute non sarà effettuata.
+
 ## Installazione
 
 Vai alla sezione **Releases** del repository (in alto a destra) oppure apri direttamente https://github.com/rasoipress/Scraaaper/releases e scarica il file adatto al tuo computer.
