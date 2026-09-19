@@ -49,6 +49,9 @@ Each result shows **author – title – year – format**. When a source does n
 Sorting, format, and language controls are visually separated. The language menu supports multiple selection and greys out languages not represented in the current results. A year range is also available, along with a multi-select discipline filter when supported by academic results.
 
 ***
+***
+***
+
 
 # Scraaaper
 
@@ -100,4 +103,3 @@ Ogni risultato mostra **autore – titolo – anno – formato**. Quando una fon
 
 I controlli di ordinamento, formato e lingua sono separati visivamente. Il menu lingua permette la selezione multipla e rende grigie le lingue assenti dai risultati correnti. Sono disponibili anche un intervallo di anni e, quando supportato dai risultati accademici, il filtro multiplo per disciplina.
 
-Fonti
